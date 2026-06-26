@@ -67,7 +67,7 @@ Triage ranks tasks by **deadline proximity × effort remaining × avoidance sign
 
 - **Phase 1 — core loop (days 1–2):** task store + persistence, brain-dump parse, triage briefing, engage→diagnose→act, commit→check-back→proof. Demonstrates the full differentiation.
 - **Phase 2 — depth (day 3):** behavioral-signal logging driving diagnosis, honest follow-through tracking, the "expecting you" persona, reasoning shown out loud cleanly.
-- **Phase 3 — stretch (day 4, only if ahead):** morning email digest for real closed-app nudges (+ Google-tech points); then Calendar. Otherwise day 4 = polish, deploy on AI Studio, write submission doc.
+- **Phase 3 — stretch (day 4, only if ahead):** morning email digest for real closed-app nudges (+ Google-tech points); then Calendar. Otherwise day 4 = polish, deploy on Google Cloud Run, write submission doc.
 
 ## Reuse vs. build
 
@@ -77,4 +77,4 @@ Triage ranks tasks by **deadline proximity × effort remaining × avoidance sign
 
 ## Tech
 
-Next.js (App Router) · TypeScript · Tailwind · Framer Motion · Google Gemini (`gemini-2.5-flash`) via `@google/genai`, deployed on Google AI Studio.
+Next.js (App Router) · TypeScript · Tailwind · Framer Motion · Google Gemini (`gemini-2.5-flash`) via `@google/genai`, deployed on Google Cloud Run. Google AI Studio is useful for build/deploy flow, but the mentor session clarified that the mandatory requirement is a deployed Google Cloud link.

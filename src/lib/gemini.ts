@@ -1,7 +1,9 @@
 import { GoogleGenAI } from '@google/genai'
 import type { ReflectionData, Step, ParsedTask, ClutchTask } from './types'
+import { formatDeadlineISO } from './date'
 
 const MODEL = 'gemini-2.5-flash'
+const GEMINI_TIMEOUT_MS = 22_000
 
 // Lazily construct the client so a missing key produces a clear, actionable
 // error at call time rather than a cryptic auth failure deep in the SDK.
@@ -33,12 +35,40 @@ const TRACE_SCHEMA = {
   propertyOrdering: ['observing', 'hypothesis', 'strategy', 'hint', 'fullAnswer'],
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function withGeminiResilience<T>(label: string, call: () => Promise<T>): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await Promise.race([
+        call(),
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), GEMINI_TIMEOUT_MS)),
+      ])
+    } catch (e) {
+      lastError = e
+      if (attempt === 0) await sleep(700)
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`${label} failed`)
+}
+
+function parseJSON<T>(text: string | undefined, fallback: T): T {
+  try {
+    return JSON.parse(text ?? '') as T
+  } catch {
+    return fallback
+  }
+}
+
 /**
  * Parse a free-form brain dump into structured tasks. `todayISO` (YYYY-MM-DD)
  * anchors relative dates like "Friday" or "next week".
  */
 export async function parseBrainDump(dump: string, todayISO: string): Promise<ParsedTask[]> {
-  const response = await getClient().models.generateContent({
+  const response = await withGeminiResilience('parse brain dump', () => getClient().models.generateContent({
     model: MODEL,
     contents: `Today is ${todayISO}. The user dumped everything on their mind below. Extract each distinct task or commitment. For each: a short imperative title, a deadline as an ISO date (YYYY-MM-DD) resolved relative to today (null if none is mentioned or implied), an effort tier ("quick" < 15 min, "medium" ~1 hour, "deep" multi-hour), and a category. Infer sensible deadlines when strongly implied (e.g. "birthday next week"). Do not invent tasks that aren't there.\n\nBrain dump:\n"""${dump}"""`,
     config: {
@@ -67,8 +97,8 @@ export async function parseBrainDump(dump: string, todayISO: string): Promise<Pa
         required: ['tasks'],
       },
     },
-  })
-  const parsed = JSON.parse(response.text ?? '{"tasks":[]}') as { tasks: ParsedTask[] }
+  }))
+  const parsed = parseJSON(response.text, { tasks: fallbackParse(dump) }) as { tasks: ParsedTask[] }
   return parsed.tasks
 }
 
@@ -77,6 +107,8 @@ export interface ActionPlan {
   suggestedAction: string
   suggestedMinutes: number
   artifact: string
+  agentTrace?: { label: string; detail: string }[]
+  toolCalls?: string[]
 }
 
 export interface QAPair {
@@ -91,14 +123,23 @@ export interface ProofReview {
   solid: boolean
 }
 
-type TaskCtx = Pick<ClutchTask, 'title' | 'deadline' | 'effort' | 'category' | 'deferralCount'>
+type TaskCtx = Pick<ClutchTask, 'title' | 'deadline' | 'effort' | 'category' | 'deferralCount'> &
+  Partial<Pick<ClutchTask, 'openedThenBailed' | 'progressNotes' | 'commitments' | 'artifact'>>
 
 function taskSignals(task: TaskCtx): string {
-  const parsedDeadline = task.deadline ? new Date(task.deadline) : null
-  const deadlineStr = parsedDeadline && !Number.isNaN(parsedDeadline.getTime())
-    ? parsedDeadline.toISOString().slice(0, 10)
-    : 'no hard deadline'
-  return `deferred ${task.deferralCount} time(s), effort ~${task.effort}, category ${task.category}, deadline ${deadlineStr}`
+  const notes = (task.progressNotes ?? []).slice(-3)
+  const outcomes = (task.commitments ?? [])
+    .slice(-3)
+    .map((c) => `${c.action}: ${c.outcome?.status ?? 'committed, no proof yet'}`)
+  return [
+    `deferred ${task.deferralCount} time(s)`,
+    `opened then bailed ${task.openedThenBailed ?? 0} time(s)`,
+    `effort ~${task.effort}`,
+    `category ${task.category}`,
+    `deadline ${formatDeadlineISO(task.deadline)}`,
+    notes.length ? `recent progress: ${notes.join(' | ')}` : 'recent progress: none',
+    outcomes.length ? `recent commitments: ${outcomes.join(' | ')}` : 'recent commitments: none',
+  ].join(', ')
 }
 
 /**
@@ -106,7 +147,7 @@ function taskSignals(task: TaskCtx): string {
  * give genuinely tailored help. This is what stops "exam tomorrow" → generic plan.
  */
 export async function scopeQuestions(task: TaskCtx): Promise<string[]> {
-  const response = await getClient().models.generateContent({
+  const response = await withGeminiResilience('scope questions', () => getClient().models.generateContent({
     model: MODEL,
     contents: `You are Clutch, a sharp accountability partner about to help with a task — but the task as stated is too vague to help well. Ask the 2-4 MOST useful, specific questions you genuinely need answered to give tailored (not generic) help. Each question must be short and answerable in a phrase. Make them concrete to THIS task. Include one that surfaces what's making them put it off, only if useful. Do not ask more than 4.
 
@@ -122,8 +163,8 @@ Example — for "study for exam tomorrow" good questions are: "Which subject/exa
         required: ['questions'],
       },
     },
-  })
-  const parsed = JSON.parse(response.text ?? '{"questions":[]}') as { questions: string[] }
+  }))
+  const parsed = parseJSON(response.text, { questions: fallbackQuestions(task) }) as { questions: string[] }
   return parsed.questions.slice(0, 4)
 }
 
@@ -134,7 +175,7 @@ Example — for "study for exam tomorrow" good questions are: "Which subject/exa
 export async function generateAction(task: TaskCtx, qa: QAPair[], note?: string): Promise<ActionPlan> {
   const context = qa.filter((p) => p.answer.trim()).map((p) => `- ${p.question} → ${p.answer}`).join('\n')
 
-  const response = await getClient().models.generateContent({
+  const response = await withGeminiResilience('generate action', () => getClient().models.generateContent({
     model: MODEL,
     contents: `You are Clutch, a sharp, warm accountability partner who gets people into action — not a cheerleader, not a lecturer.
 
@@ -147,7 +188,9 @@ Use their specifics. Do NOT give generic advice — tailor everything to what th
 - diagnosis: 1-2 honest, specific sentences naming what's really going on, referencing their answers. No flattery.
 - suggestedAction: ONE concrete thing to do RIGHT NOW, an imperative they can commit to, sized to the time they have.
 - suggestedMinutes: a realistic time box (5-45).
-- artifact: the actual started-for-them deliverable, specific to their answers — e.g. a prioritized study plan for THEIR weak topics across THEIR available hours, a real draft, a worked example, or a concrete first step. Genuinely usable, plain text / markdown. Not a description of what to do — the thing itself.`,
+- artifact: the actual started-for-them deliverable, specific to their answers — e.g. a prioritized study plan for THEIR weak topics across THEIR available hours, a real draft, a worked example, or a concrete first step. Genuinely usable, plain text / markdown. Not a description of what to do — the thing itself.
+- agentTrace: 3-4 short visible audit steps showing what you observed, which local tool/intervention you chose, and why.
+- toolCalls: the local tools you conceptually used from this list: inspectBehaviorMemory, diagnoseAvoidance, selectIntervention, generateArtifact, setCommitment.`,
     config: {
       responseMimeType: 'application/json',
       responseSchema: {
@@ -157,13 +200,32 @@ Use their specifics. Do NOT give generic advice — tailor everything to what th
           suggestedAction: { type: 'string' },
           suggestedMinutes: { type: 'number' },
           artifact: { type: 'string' },
+          agentTrace: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                label: { type: 'string' },
+                detail: { type: 'string' },
+              },
+              required: ['label', 'detail'],
+              propertyOrdering: ['label', 'detail'],
+            },
+          },
+          toolCalls: { type: 'array', items: { type: 'string' } },
         },
-        required: ['diagnosis', 'suggestedAction', 'suggestedMinutes', 'artifact'],
-        propertyOrdering: ['diagnosis', 'suggestedAction', 'suggestedMinutes', 'artifact'],
+        required: ['diagnosis', 'suggestedAction', 'suggestedMinutes', 'artifact', 'agentTrace', 'toolCalls'],
+        propertyOrdering: ['diagnosis', 'suggestedAction', 'suggestedMinutes', 'artifact', 'agentTrace', 'toolCalls'],
       },
     },
-  })
-  return JSON.parse(response.text ?? '{}') as ActionPlan
+  }))
+  const fallback = fallbackAction(task, qa)
+  const parsed = parseJSON(response.text, fallback) as ActionPlan
+  return {
+    ...parsed,
+    agentTrace: parsed.agentTrace?.length ? parsed.agentTrace : fallback.agentTrace,
+    toolCalls: parsed.toolCalls?.length ? parsed.toolCalls : fallback.toolCalls,
+  }
 }
 
 /**
@@ -199,7 +261,7 @@ Return:
 - solid: true ONLY if the shown evidence genuinely demonstrates the committed work was done to a reasonable standard; false if it's missing, vague, thin, or unverified.`,
   })
 
-  const response = await getClient().models.generateContent({
+  const response = await withGeminiResilience('review proof', () => getClient().models.generateContent({
     model: MODEL,
     contents: [{ role: 'user', parts }],
     config: {
@@ -215,8 +277,58 @@ Return:
         propertyOrdering: ['reaction', 'nextNudge', 'solid'],
       },
     },
-  })
-  return JSON.parse(response.text ?? '{}') as ProofReview
+  }))
+  return parseJSON(response.text, fallbackReview(status, proofText, Boolean(proofImage))) as ProofReview
+}
+
+function fallbackParse(dump: string): ParsedTask[] {
+  return dump
+    .split(/[\n.;]+/)
+    .map((title) => title.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((title) => ({ title, deadlineISO: null, effort: title.length > 48 ? 'medium' : 'quick', category: 'other' as const }))
+}
+
+function fallbackQuestions(task: TaskCtx): string[] {
+  return [
+    `What is the exact deliverable for "${task.title}"?`,
+    'What is the smallest version that would still count?',
+    'What are you avoiding: unclear scope, fear it will fail, boredom, or not knowing how?',
+  ]
+}
+
+function fallbackAction(task: TaskCtx, qa: QAPair[]): ActionPlan {
+  const firstAnswer = qa.find((p) => p.answer.trim())?.answer.trim()
+  return {
+    diagnosis: `This is at risk because it has ${task.deferralCount} deferral(s) and no reliable proof loop yet. The immediate move is to create the smallest visible artifact, not solve the whole task.`,
+    suggestedAction: `Create the smallest acceptable version of "${task.title}"`,
+    suggestedMinutes: 20,
+    artifact: [
+      `Minimum viable deliverable for ${task.title}`,
+      firstAnswer ? `Known specific: ${firstAnswer}` : 'Write the exact deliverable in one sentence.',
+      'List the required sections or acceptance criteria.',
+      'Fill the hardest blank with a rough first draft.',
+      'Save or screenshot proof before polishing.',
+    ].join('\n'),
+    agentTrace: [
+      { label: 'inspectBehaviorMemory', detail: `Saw ${task.deferralCount} deferral(s), ${task.openedThenBailed ?? 0} bailout(s), and ${(task.progressNotes ?? []).length} progress note(s).` },
+      { label: 'diagnoseAvoidance', detail: 'Likely blocker is scope or quality anxiety, so the intervention trims the task to a minimum viable artifact.' },
+      { label: 'generateArtifact', detail: 'Produced a fallback artifact locally so the demo can continue even if Gemini is unavailable.' },
+    ],
+    toolCalls: ['inspectBehaviorMemory', 'diagnoseAvoidance', 'generateArtifact', 'setCommitment'],
+  }
+}
+
+function fallbackReview(status: string, proofText: string, hasImage: boolean): ProofReview {
+  const hasSubstance = proofText.trim().length > 40 || hasImage
+  return {
+    solid: status === 'done' && hasSubstance,
+    reaction: hasSubstance
+      ? 'I can see concrete evidence, so I am logging this as real progress. Tighten the next step while the context is still warm.'
+      : 'That proof is too thin to verify the commitment. Show the actual artifact, link, screenshot, or pasted work.',
+    nextNudge: hasSubstance ? 'Add the next missing detail, then stop polishing.' : 'Paste or attach the work itself, not a summary of effort.',
+  }
 }
 
 export async function decomposeTask(task: string, minutes: number) {

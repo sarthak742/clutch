@@ -1,7 +1,10 @@
 import { scopeQuestions } from '@/lib/gemini'
+import { guardRequest } from '@/lib/apiGuard'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
+  const blocked = guardRequest(req)
+  if (blocked) return blocked
   const { task } = await req.json()
   try {
     const questions = await scopeQuestions(task)

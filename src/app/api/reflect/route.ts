@@ -1,7 +1,10 @@
 import { generateReflection } from '@/lib/gemini'
+import { guardRequest } from '@/lib/apiGuard'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
+  const blocked = guardRequest(req)
+  if (blocked) return blocked
   const { task, steps, totalMinutes, stuckCount, elapsedSeconds } = await req.json()
   try {
     const result = await generateReflection(task, steps, totalMinutes, stuckCount, elapsedSeconds)

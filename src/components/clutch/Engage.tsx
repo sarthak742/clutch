@@ -36,7 +36,17 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const scopedRef = useRef(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const ctx = { title: task.title, deadline: task.deadline, effort: task.effort, category: task.category, deferralCount: task.deferralCount }
+  const ctx = {
+    title: task.title,
+    deadline: task.deadline,
+    effort: task.effort,
+    category: task.category,
+    deferralCount: task.deferralCount,
+    openedThenBailed: task.openedThenBailed,
+    progressNotes: task.progressNotes,
+    commitments: task.commitments,
+    artifact: task.artifact,
+  }
 
   useEffect(() => {
     if (scopedRef.current) return
@@ -71,7 +81,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
       if (!res.ok || 'error' in payload) throw new Error('error' in payload ? payload.error : `Request failed (${res.status})`)
       setPlan(payload)
       setMinutes(Math.max(5, Math.min(45, Math.round(payload.suggestedMinutes || 15))))
-      onUpdateTask(task.id, { artifact: payload.artifact, lastTouched: Date.now() })
+      onUpdateTask(task.id, { artifact: payload.artifact, agentTrace: payload.agentTrace ?? [], lastTouched: Date.now() })
       setStep('plan')
     } catch (e) {
       alert(`Clutch couldn't work that out.\n\n${e instanceof Error ? e.message : String(e)}`)
@@ -123,7 +133,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     } catch { /* neutral logging */ }
     setReview(result)
 
-    const outcome: CommitmentOutcome = { status, proof: proofText.trim() || undefined, proofImage: proofImage ?? undefined, at: Date.now() }
+    const outcome: CommitmentOutcome = { status, proof: proofText.trim() || undefined, proofImage: proofImage ?? undefined, reviewSolid: result?.solid, reviewReaction: result?.reaction, at: Date.now() }
     const solid = result ? result.solid : true
     const counted = status === 'done' && solid && !countedRef.current
     onUpdateTask(task.id, {
@@ -137,6 +147,12 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   }
 
   const backToWork = () => { setSecondsLeft(10 * 60); setTotalSeconds(10 * 60); setRunning(true); setStep('work') }
+  const leaveEngage = () => {
+    if (!commitmentId.current && step !== 'done') {
+      onUpdateTask(task.id, { openedThenBailed: task.openedThenBailed + 1, lastTouched: Date.now() })
+    }
+    onBack()
+  }
 
   const mmss = `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`
   const timerDeg = `${Math.min(360, ((totalSeconds - secondsLeft) / Math.max(1, totalSeconds)) * 360)}deg`
@@ -150,7 +166,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
       <div style={{ animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both', display: 'flex', flexDirection: 'column', minHeight: '100dvh', padding: '24px 0 44px' }}>
         {/* Header: back + step dots + counter */}
         <div className="flex items-center gap-3.5" style={{ paddingTop: 8, marginBottom: 6 }}>
-          <button onClick={onBack} aria-label="Back" className="btn-ghost flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0 }}>
+          <button onClick={leaveEngage} aria-label="Back" className="btn-ghost flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0 }}>
             <ArrowLeft size={17} weight="bold" />
           </button>
           <div className="flex gap-1.5" style={{ flex: 1 }}>
@@ -212,6 +228,28 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
           <div style={{ animation: 'stepIn .62s cubic-bezier(.2,.65,.25,1) both', flex: 1, display: 'flex', flexDirection: 'column', paddingTop: 14 }}>
             <span className="eyebrow" style={{ marginBottom: 12 }}>The honest read</span>
             <h2 className="serif" style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.18, marginBottom: 24, letterSpacing: '-.005em' }}>{plan.diagnosis}</h2>
+
+            {plan.agentTrace && plan.agentTrace.length > 0 && (
+              <div className="glass" style={{ borderRadius: 18, padding: 16, marginBottom: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>Agent audit trail</div>
+                <div className="flex flex-col" style={{ gap: 10 }}>
+                  {plan.agentTrace.map((item, i) => (
+                    <div key={`${item.label}-${i}`} className="flex gap-3" style={{ alignItems: 'flex-start' }}>
+                      <span className="mono" style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(90,99,230,.14)', color: 'var(--accent)', fontSize: 11, flexShrink: 0 }}>{i + 1}</span>
+                      <div>
+                        <div className="mono" style={{ fontSize: 12, color: 'rgba(243,245,244,.86)', marginBottom: 3 }}>{item.label}</div>
+                        <div style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--dim)' }}>{item.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {plan.toolCalls && plan.toolCalls.length > 0 && (
+                  <div style={{ marginTop: 13, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.08)', fontSize: 12, color: 'var(--faint)' }}>
+                    tools: {plan.toolCalls.join(' -> ')}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="glass" style={{ borderRadius: 22, overflow: 'hidden', marginBottom: 18 }}>
               <div className="flex items-center gap-2.5" style={{ padding: '15px 18px', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(90,99,230,.06)' }}>

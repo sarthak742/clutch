@@ -1,4 +1,5 @@
 import type { ParsedTask, ClutchTask } from './types'
+import { parseDeadlineISO } from './date'
 
 /** Hydrate a parsed task into a full ClutchTask with behavioral fields zeroed. */
 export function fromParsed(p: ParsedTask): ClutchTask {
@@ -7,7 +8,7 @@ export function fromParsed(p: ParsedTask): ClutchTask {
     id: crypto.randomUUID(),
     title: p.title,
     // end-of-day on the parsed date; null when no deadline
-    deadline: p.deadlineISO ? new Date(`${p.deadlineISO}T23:59:59`).getTime() : null,
+    deadline: parseDeadlineISO(p.deadlineISO),
     effort: p.effort,
     category: p.category,
     status: 'todo',

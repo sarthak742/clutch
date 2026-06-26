@@ -7,12 +7,13 @@ import type { ParsedTask } from '@/lib/types'
 interface Props {
   hasExisting: boolean
   onParsed: (tasks: ParsedTask[]) => void
+  onLoadDemo?: () => void
   onCancel?: () => void
 }
 
 const PLACEHOLDER = 'essay due friday, call the dentist, taxes this month, reply to the landlord…'
 
-export function Capture({ hasExisting, onParsed, onCancel }: Props) {
+export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) {
   const [dump, setDump] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -98,6 +99,9 @@ export function Capture({ hasExisting, onParsed, onCancel }: Props) {
 
               <div className="flex items-center justify-between">
                 <span className="mono" style={{ fontSize: 11, color: 'var(--faint)' }}>⌘ / Ctrl + Enter</span>
+                {!hasExisting && onLoadDemo && (
+                  <button onClick={onLoadDemo} className="mono" style={{ fontSize: 12, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}>load demo scenario</button>
+                )}
                 {hasExisting && onCancel && (
                   <button onClick={onCancel} className="mono" style={{ fontSize: 12, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}>cancel</button>
                 )}

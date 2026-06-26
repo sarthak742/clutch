@@ -44,6 +44,8 @@ export interface CommitmentOutcome {
   proof?: string
   /** Base64 screenshot shown as proof. */
   proofImage?: string
+  reviewSolid?: boolean
+  reviewReaction?: string
   at: number
 }
 
@@ -73,7 +75,13 @@ export interface ClutchTask {
   blocker?: BlockerKind
   /** The produced plan / draft / first step. */
   artifact?: string
+  agentTrace?: AgentTraceItem[]
   commitments: Commitment[]
+}
+
+export interface AgentTraceItem {
+  label: string
+  detail: string
 }
 
 /** Raw shape returned by the brain-dump parser before we hydrate to ClutchTask. */

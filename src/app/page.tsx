@@ -6,8 +6,9 @@ import { Capture } from '@/components/clutch/Capture'
 import { Briefing } from '@/components/clutch/Briefing'
 import { Engage } from '@/components/clutch/Engage'
 import { AppBackground } from '@/components/clutch/AppBackground'
-import { loadTasks, saveTasks, loadFollowThrough, saveFollowThrough } from '@/lib/store'
+import { loadClutchState, saveClutchState } from '@/lib/store'
 import { fromParsed } from '@/lib/task'
+import { createDemoState } from '@/lib/demo'
 import type { ClutchTask, ParsedTask, FollowThrough } from '@/lib/types'
 
 type View = 'capture' | 'briefing' | 'engage'
@@ -20,26 +21,34 @@ export default function Home() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const t = loadTasks()
-    setTasks(t)
-    setFollowThrough(loadFollowThrough())
-    setView(t.length === 0 ? 'capture' : 'briefing')
+    const state = loadClutchState()
+    setTasks(state.tasks)
+    setFollowThrough(state.followThrough)
+    setView(state.tasks.length === 0 ? 'capture' : 'briefing')
     setReady(true)
   }, [])
 
-  const persist = (next: ClutchTask[]) => {
+  const persist = (next: ClutchTask[], nextFollowThrough = followThrough) => {
     setTasks(next)
-    saveTasks(next)
+    saveClutchState(next, nextFollowThrough)
   }
 
   const persistFollowThrough = (next: FollowThrough) => {
     setFollowThrough(next)
-    saveFollowThrough(next)
+    saveClutchState(tasks, next)
   }
 
   const handleParsed = (parsed: ParsedTask[]) => {
     const next = [...tasks, ...parsed.map(fromParsed)]
     persist(next)
+    setView('briefing')
+  }
+
+  const handleLoadDemo = () => {
+    if (tasks.length > 0) return
+    const demo = createDemoState()
+    setFollowThrough(demo.followThrough)
+    persist(demo.tasks, demo.followThrough)
     setView('briefing')
   }
 
@@ -75,6 +84,7 @@ export default function Home() {
               <Capture
                 hasExisting={tasks.length > 0}
                 onParsed={handleParsed}
+                onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined}
                 onCancel={tasks.length > 0 ? () => setView('briefing') : undefined}
               />
             </motion.div>

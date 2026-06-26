@@ -1,7 +1,10 @@
 import { streamTrace } from '@/lib/gemini'
+import { guardRequest } from '@/lib/apiGuard'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
+  const blocked = guardRequest(req)
+  if (blocked) return blocked
   const { step, task, screenshot } = await req.json()
 
   // Pull the first chunk up front so failures that happen before any output

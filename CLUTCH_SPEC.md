@@ -21,6 +21,8 @@ People will start things but won't put in effort when nobody is looking. The mis
 
 Clutch lives in the gap: **more proactive than a chatbot, more intelligent than automation.** The drafting/decomposition is table stakes; the product is the judgment delivered proactively + the accountability loop.
 
+Implementation note: Clutch uses a deterministic product spine for reliability, then feeds behavioral memory into Gemini for diagnosis, artifact generation, proof review, and a visible agent audit trail. The main commit/proof flow is not model-driven. A separate optional "Plan my day" action uses Gemini SDK functionDeclarations for one real function-calling round trip.
+
 ## How accountability works without real surveillance
 
 The AI can't watch you work, so accountability is built from four real mechanics:
@@ -56,7 +58,7 @@ Triage ranks tasks by **deadline proximity × effort remaining × avoidance sign
 | Criterion | Weight | Where it's earned |
 |---|---|---|
 | Problem Solving & Impact | 20% | Risk triage, "most likely to blow up", real completion not reminders |
-| Agentic Depth | 20% | Diagnose-why-stuck from logged signals, reason out loud, act, follow up, close loop |
+| Agentic Depth | 20% | Diagnose-why-stuck from logged signals, visible audit trail, optional Gemini function call, act, follow up, close loop |
 | Innovation & Creativity | 20% | Accountability-by-proof loop; behavioral avoidance detection; diagnosis decides the artifact |
 | Google Technologies | 15% | Gemini (parsing, triage, diagnosis, generation) via Google AI Studio; stretch: email digest / Calendar |
 | Product Experience & Design | 10% | Clean briefing + work + proof screens |

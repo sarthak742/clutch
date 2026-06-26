@@ -245,7 +245,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                 </div>
                 {plan.toolCalls && plan.toolCalls.length > 0 && (
                   <div style={{ marginTop: 13, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.08)', fontSize: 12, color: 'var(--faint)' }}>
-                    tools: {plan.toolCalls.join(' -> ')}
+                    pipeline: {plan.toolCalls.join(' -> ')}
                   </div>
                 )}
               </div>

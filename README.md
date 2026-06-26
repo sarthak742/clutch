@@ -4,6 +4,8 @@ CLUTCH is an AI accountability companion for the Vibe2Ship hackathon, Problem St
 
 It is not a passive to-do list. It takes a messy brain dump, identifies what is most likely to blow up, asks task-specific scope questions, generates a concrete first move with Gemini, starts a commitment timer, and then asks for proof before marking the work complete.
 
+The core loop uses an agentic pipeline rather than a free-running autonomous agent: deterministic triage and state transitions keep the demo reliable, while full behavioral memory is fed to Gemini for diagnosis, artifact generation, proof review, and a visible audit trail. An optional "Plan my day" action demonstrates real Gemini function calling in an isolated path.
+
 ## Why It Exists
 
 People do not usually miss important work because they forgot it exists. They miss it because it is vague, intimidating, boring, or easy to delay when nobody is checking. CLUTCH creates a lightweight accountability loop:
@@ -29,6 +31,8 @@ People do not usually miss important work because they forgot it exists. They mi
 ## Google Technologies
 
 - Gemini 2.5 Flash for brain-dump parsing, scope questions, action generation, and proof review
+- Visible agent audit trail built from behavioral memory and deterministic pipeline steps
+- Optional Gemini function-calling round trip for day planning
 - Google Cloud Run target deployment
 
 ## Local Development

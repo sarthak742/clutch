@@ -23,9 +23,12 @@ Problem Statement 1: "The Last-Minute Life Saver"
 
 CLUTCH solves the problem as a proactive AI accountability companion. It does not stop at reminders. It parses a user's messy workload, identifies what is most likely to fail, asks task-specific scope questions, generates the first useful artifact with Gemini, starts a timed commitment, and verifies proof before logging completion.
 
+The agentic depth comes from the observe -> diagnose -> generate -> commit -> verify pipeline, behavioral memory, and a visible audit trail. The core loop remains deterministic so the live demo is reliable. The optional "Plan my day" action is the narrow place where the project uses Gemini SDK function-calling.
+
 ## Google Usage
 
 - Gemini 2.5 Flash via `@google/genai`
 - Multimodal proof review with text and image evidence
+- Gemini functionDeclarations in the optional day-planning action
 - Google Cloud Run deployment target
 - Google Doc project description for submission

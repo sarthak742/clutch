@@ -1,6 +1,7 @@
-import { GoogleGenAI } from '@google/genai'
+import { FunctionCallingConfigMode, GoogleGenAI } from '@google/genai'
 import type { ReflectionData, Step, ParsedTask, ClutchTask } from './types'
 import { formatDeadlineISO } from './date'
+import { rankTasks } from './triage'
 
 const MODEL = 'gemini-2.5-flash'
 const GEMINI_TIMEOUT_MS = 22_000
@@ -108,6 +109,7 @@ export interface ActionPlan {
   suggestedMinutes: number
   artifact: string
   agentTrace?: { label: string; detail: string }[]
+  /** Visible pipeline steps, not Gemini SDK function-calling. */
   toolCalls?: string[]
 }
 
@@ -121,6 +123,14 @@ export interface ProofReview {
   nextNudge: string
   /** Whether the shown proof genuinely satisfies what they committed to. */
   solid: boolean
+}
+
+export interface DayPlan {
+  summary: string
+  nextTaskId: string | null
+  nextAction: string
+  functionCalled: boolean
+  audit: { label: string; detail: string }[]
 }
 
 type TaskCtx = Pick<ClutchTask, 'title' | 'deadline' | 'effort' | 'category' | 'deferralCount'> &
@@ -190,7 +200,7 @@ Use their specifics. Do NOT give generic advice — tailor everything to what th
 - suggestedMinutes: a realistic time box (5-45).
 - artifact: the actual started-for-them deliverable, specific to their answers — e.g. a prioritized study plan for THEIR weak topics across THEIR available hours, a real draft, a worked example, or a concrete first step. Genuinely usable, plain text / markdown. Not a description of what to do — the thing itself.
 - agentTrace: 3-4 short visible audit steps showing what you observed, which local tool/intervention you chose, and why.
-- toolCalls: the local tools you conceptually used from this list: inspectBehaviorMemory, diagnoseAvoidance, selectIntervention, generateArtifact, setCommitment.`,
+- toolCalls: the deterministic pipeline steps represented in this intervention from this list: inspectBehaviorMemory, diagnoseAvoidance, selectIntervention, generateArtifact, setCommitment.`,
     config: {
       responseMimeType: 'application/json',
       responseSchema: {
@@ -328,6 +338,108 @@ function fallbackReview(status: string, proofText: string, hasImage: boolean): P
       ? 'I can see concrete evidence, so I am logging this as real progress. Tighten the next step while the context is still warm.'
       : 'That proof is too thin to verify the commitment. Show the actual artifact, link, screenshot, or pasted work.',
     nextNudge: hasSubstance ? 'Add the next missing detail, then stop polishing.' : 'Paste or attach the work itself, not a summary of effort.',
+  }
+}
+
+export async function planDayWithFunctionCalling(tasks: ClutchTask[]): Promise<DayPlan> {
+  const active = tasks.filter((t) => t.status !== 'done' && t.status !== 'dropped')
+  const fallback = fallbackDayPlan(active)
+  if (active.length === 0) return fallback
+
+  const declaration = {
+    name: 'prioritizeDay',
+    description: 'Deterministically rank the user tasks by deadline pressure, effort, and logged avoidance signals.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        timeBudgetMinutes: { type: 'number', description: 'Minutes the user can spend right now.' },
+        mode: { type: 'string', description: 'The planning mode to apply.' },
+      },
+      required: ['timeBudgetMinutes', 'mode'],
+    },
+  }
+
+  const prompt = `You are Clutch. Pick the best first intervention for today. You must call prioritizeDay before answering.
+
+Tasks:
+${active.map((t) => `- ${t.id}: ${t.title}; ${taskSignals(t)}`).join('\n')}`
+
+  const first = await withGeminiResilience('plan day function call', () => getClient().models.generateContent({
+    model: MODEL,
+    contents: prompt,
+    config: {
+      tools: [{ functionDeclarations: [declaration] }],
+      toolConfig: {
+        functionCallingConfig: {
+          mode: FunctionCallingConfigMode.ANY,
+          allowedFunctionNames: ['prioritizeDay'],
+        },
+      },
+    },
+  }))
+
+  const call = first.functionCalls?.[0]
+  if (!call || call.name !== 'prioritizeDay') return fallback
+
+  const toolOutput = executePrioritizeDay(active, Number(call.args?.timeBudgetMinutes ?? 30))
+  const second = await withGeminiResilience('plan day summary', () => getClient().models.generateContent({
+    model: MODEL,
+    contents: [
+      { role: 'user', parts: [{ text: prompt }] },
+      { role: 'model', parts: [{ functionCall: call }] },
+      { role: 'user', parts: [{ functionResponse: { name: 'prioritizeDay', response: { output: toolOutput } } }] },
+    ],
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string' },
+          nextTaskId: { type: 'string', nullable: true },
+          nextAction: { type: 'string' },
+        },
+        required: ['summary', 'nextTaskId', 'nextAction'],
+        propertyOrdering: ['summary', 'nextTaskId', 'nextAction'],
+      },
+    },
+  }))
+
+  const parsed = parseJSON(second.text, fallback) as Pick<DayPlan, 'summary' | 'nextTaskId' | 'nextAction'>
+  return {
+    ...parsed,
+    functionCalled: true,
+    audit: [
+      { label: 'Gemini function call', detail: `Model requested ${call.name}(${JSON.stringify(call.args ?? {})}).` },
+      { label: 'Local tool result', detail: `Deterministic rank returned ${toolOutput.ranked.map((r) => r.title).join(' -> ')}.` },
+      { label: 'Final recommendation', detail: parsed.nextAction },
+    ],
+  }
+}
+
+function executePrioritizeDay(tasks: ClutchTask[], timeBudgetMinutes: number) {
+  const ranked = rankTasks(tasks, Date.now()).slice(0, 3)
+  return {
+    timeBudgetMinutes,
+    ranked: ranked.map((r) => ({
+      id: r.task.id,
+      title: r.task.title,
+      score: r.score,
+      reason: r.reason,
+      recommendedAction: r.task.effort === 'deep' ? 'Cut scope and produce the minimum viable artifact.' : 'Finish and verify this quick commitment.',
+    })),
+  }
+}
+
+function fallbackDayPlan(tasks: ClutchTask[]): DayPlan {
+  const top = rankTasks(tasks, Date.now())[0]
+  return {
+    summary: top ? `${top.task.title} is the safest first intervention because ${top.reason.toLowerCase()}.` : 'No active tasks need a rescue plan right now.',
+    nextTaskId: top?.task.id ?? null,
+    nextAction: top ? `Start with "${top.task.title}" and produce proof before polishing anything else.` : 'Add a brain dump when something starts to feel risky.',
+    functionCalled: false,
+    audit: [
+      { label: 'Deterministic fallback', detail: 'Used local ranking because Gemini function calling was unavailable or unnecessary.' },
+    ],
   }
 }
 

@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { Plus, WarningOctagon, ArrowRight, CalendarX, HourglassMedium, ArrowUUpLeft, MoonStars } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
 import { deadlineLabel, EFFORT_LABEL } from '@/lib/task'
+import type { DayPlan } from '@/lib/gemini'
 
 interface Props {
   tasks: ClutchTask[]
@@ -20,6 +22,8 @@ function dotColor(score: number) {
 }
 
 export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }: Props) {
+  const [dayPlan, setDayPlan] = useState<DayPlan | null>(null)
+  const [planning, setPlanning] = useState(false)
   const now = Date.now()
   const ranked = rankTasks(tasks, now)
   const top = ranked[0]
@@ -29,6 +33,22 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
     followThrough.committed > 0
       ? Math.round((followThrough.completed / followThrough.committed) * 100)
       : null
+
+  const planDay = async () => {
+    if (planning) return
+    setPlanning(true)
+    try {
+      const res = await fetch('/api/plan-day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks }),
+      })
+      const payload = (await res.json()) as DayPlan | { error: string }
+      if (res.ok && !('error' in payload)) setDayPlan(payload)
+    } finally {
+      setPlanning(false)
+    }
+  }
 
   return (
     <div style={{ maxWidth: 620, margin: '0 auto', padding: '0 clamp(20px,5vw,40px)' }}>
@@ -98,6 +118,19 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
                   </div>
                   <span className="mono" style={{ fontSize: 12, color: 'var(--accent)' }}>{Math.min(99, Math.max(15, Math.round(top.score)))}% risk</span>
                 </div>
+
+                <button onClick={planDay} className="btn-ghost" style={{ width: '100%', marginBottom: 10, padding: 13, borderRadius: 14, fontSize: 14, fontWeight: 600 }}>
+                  {planning ? 'Planning with Gemini function calling...' : 'Plan my day with a real Gemini tool call'}
+                </button>
+                {dayPlan && (
+                  <div style={{ marginBottom: 12, padding: 14, borderRadius: 16, background: 'rgba(0,0,0,.22)', border: '1px solid rgba(255,255,255,.08)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: dayPlan.functionCalled ? 'var(--good)' : 'var(--warn)', marginBottom: 7 }}>
+                      {dayPlan.functionCalled ? 'Gemini function call verified' : 'Deterministic fallback used'}
+                    </div>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--dim)', marginBottom: 8 }}>{dayPlan.summary}</p>
+                    <div style={{ fontSize: 13.5, color: 'rgba(243,245,244,.86)' }}>{dayPlan.nextAction}</div>
+                  </div>
+                )}
 
                 <button onClick={() => onEngage(top.task.id)} className="btn-primary flex items-center justify-center gap-2.5" style={{ width: '100%', padding: 18, borderRadius: 16, fontSize: 16 }}>
                   <span>Start — I&apos;ll ask you a few questions</span>

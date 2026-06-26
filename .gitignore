@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# production
+build/
+
+# environment
+.env
+.env*.local
+
+# local tooling and generated state
+.agents/
+.claude/
+.impeccable/
+motion-audits/
+*.log
+*.tsbuildinfo
+.fuse_hidden*
+**/.fuse_hidden*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# local reference material
+Vibe2Ship - Problem Statements & Submission Guidelines.docx

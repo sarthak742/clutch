@@ -21,9 +21,9 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
   const grounded = latestGroundedSources(tasks)
 
   return (
-    <main style={{ maxWidth: 1240, margin: '0 auto', padding: '0 clamp(20px,4vw,56px)' }}>
-      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '30px 0 34px', animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both' }}>
-        <header className="flex items-center justify-between gap-4" style={{ paddingTop: 8 }}>
+    <main style={{ maxWidth: 1520, margin: '0 auto', padding: '0 clamp(24px,4.8vw,72px)' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '28px 0 34px', animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both' }}>
+        <header className="flex items-center justify-between gap-4" style={{ paddingTop: 4, paddingBottom: 18, borderBottom: '1px solid rgba(255,255,255,.06)' }}>
           <div className="flex items-center gap-3">
             <div style={{ width: 24, height: 24, borderRadius: '50%', border: '1.5px solid rgba(90,99,230,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 14px 2px rgba(90,99,230,.6)' }} />
@@ -37,27 +37,27 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
           )}
         </header>
 
-        <section style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0,.92fr) minmax(360px,1.08fr)', gap: 'clamp(34px,5vw,82px)', alignItems: 'center', padding: '34px 0 20px' }}>
+        <section style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(420px,.9fr) minmax(560px,1.1fr)', gap: 'clamp(42px,6vw,110px)', alignItems: 'center', padding: '42px 0 22px' }}>
           <LightTrails />
           <div style={{ position: 'relative', zIndex: 1 }}>
             <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>AI accountability companion</span>
-            <h1 className="serif" style={{ fontWeight: 400, fontSize: 'clamp(58px,8vw,112px)', lineHeight: .92, letterSpacing: 0, marginBottom: 24 }}>
+            <h1 className="serif" style={{ fontWeight: 400, fontSize: 'clamp(82px,10.4vw,176px)', lineHeight: .82, letterSpacing: 0, marginBottom: 30, color: '#f6f8ff', textShadow: '0 0 34px rgba(119,159,255,.24), 0 0 90px rgba(90,99,230,.14)' }}>
               CLUTCH
             </h1>
-            <p style={{ fontSize: 'clamp(21px,2.2vw,30px)', lineHeight: 1.22, color: 'rgba(243,245,244,.9)', maxWidth: '18ch', marginBottom: 18 }}>
+            <p style={{ fontSize: 'clamp(28px,2.8vw,46px)', lineHeight: 1.12, color: 'rgba(243,245,244,.94)', maxWidth: '18ch', marginBottom: 22, fontWeight: 700 }}>
               The app that steps in before your deadline slips.
             </p>
-            <p style={{ fontSize: 17, lineHeight: 1.65, color: 'var(--dim)', maxWidth: '39ch', marginBottom: 28 }}>
+            <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--dim)', maxWidth: '43ch', marginBottom: 34 }}>
               Dump the mess. Clutch finds the riskiest commitment, asks what matters, starts the smallest useful move, and verifies proof before it gives you credit.
             </p>
 
-            <div className="flex flex-wrap gap-3" style={{ marginBottom: 24 }}>
-              <button onClick={onStart} className="btn-primary flex items-center justify-center gap-2.5" style={{ padding: '17px 20px', borderRadius: 16, fontSize: 16 }}>
+            <div className="flex flex-wrap gap-3" style={{ marginBottom: 30 }}>
+              <button onClick={onStart} className="btn-primary flex items-center justify-center gap-2.5" style={{ padding: '20px 26px', borderRadius: 14, fontSize: 17, minWidth: 232 }}>
                 <span>{tasks.length > 0 ? 'Open my dashboard' : 'Start with my tasks'}</span>
                 <ArrowRight size={18} weight="bold" />
               </button>
               {(onLoadDemo || onAddMore) && (
-                <button onClick={onLoadDemo ?? onAddMore} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '17px 18px', borderRadius: 16, fontSize: 16, fontWeight: 700 }}>
+                <button onClick={onLoadDemo ?? onAddMore} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '20px 23px', borderRadius: 14, fontSize: 17, fontWeight: 700 }}>
                   <span>{tasks.length > 0 ? 'Add more tasks' : 'See the demo flow'}</span>
                 </button>
               )}
@@ -86,25 +86,29 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
 
 function LightTrails() {
   return (
-    <div aria-hidden="true" style={{ position: 'absolute', inset: '-8% -4% -2% 18%', zIndex: 0, pointerEvents: 'none', opacity: .9 }}>
-      {[0, 1, 2, 3, 4, 5].map((i) => (
+    <div aria-hidden="true" style={{ position: 'absolute', inset: '-8% -4% -2% 24%', zIndex: 0, pointerEvents: 'none', opacity: .98, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', left: '19%', top: '8%', width: '68%', height: '82%', background: 'radial-gradient(ellipse at 62% 48%, rgba(78,137,255,.24), transparent 58%), radial-gradient(ellipse at 72% 60%, rgba(224,177,90,.13), transparent 46%)', filter: 'blur(12px)' }} />
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
         <div
           key={i}
           style={{
             position: 'absolute',
-            left: `${i * 5}%`,
-            top: `${28 + i * 7}%`,
-            width: '72%',
-            height: 2,
+            left: `${-2 + i * 2.5}%`,
+            top: `${24 + i * 5.4}%`,
+            width: '94%',
+            height: i % 3 === 0 ? 3 : 2,
             borderRadius: 999,
-            background: `linear-gradient(90deg, transparent, rgba(${i % 2 ? '90,99,230' : '88,185,255'},.1), rgba(${i % 2 ? '90,99,230' : '88,185,255'},.72), rgba(224,177,90,.52), transparent)`,
-            transform: `rotate(${i % 2 ? -9 : 7}deg) skewX(-18deg)`,
-            filter: 'blur(.2px)',
-            boxShadow: '0 0 20px rgba(90,99,230,.35)',
+            background: `linear-gradient(90deg, transparent 0%, rgba(${i % 2 ? '90,99,230' : '90,178,255'},.08) 18%, rgba(${i % 2 ? '95,112,255' : '92,190,255'},.84) 46%, rgba(224,177,90,.68) 62%, rgba(90,99,230,.18) 76%, transparent 100%)`,
+            transform: `rotate(${i % 2 ? -8 : 5}deg) skewX(-24deg)`,
+            filter: i % 3 === 0 ? 'blur(.6px)' : 'blur(.18px)',
+            boxShadow: '0 0 18px rgba(90,99,230,.55), 0 0 38px rgba(88,185,255,.26)',
             animation: `trailDrift ${9 + i}s ease-in-out infinite`,
             animationDelay: `${i * -.9}s`,
           }}
         />
+      ))}
+      {[0, 1, 2, 3, 4].map((i) => (
+        <span key={`dot-${i}`} style={{ position: 'absolute', left: `${44 + i * 8}%`, top: `${26 + i * 10}%`, width: i === 2 ? 8 : 5, height: i === 2 ? 8 : 5, borderRadius: '50%', background: i === 2 ? 'var(--warn)' : '#72b7ff', boxShadow: i === 2 ? '0 0 18px 4px rgba(224,177,90,.55)' : '0 0 14px 3px rgba(90,160,255,.45)' }} />
       ))}
     </div>
   )
@@ -113,8 +117,8 @@ function LightTrails() {
 function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groundedCount }: { tasks: ClutchTask[]; topTitle?: string; risk: number | null; stats: ReturnType<typeof overviewStats>; followUp?: string; focusBlock?: number; groundedCount: number }) {
   const hasData = tasks.length > 0
   return (
-    <div style={{ position: 'relative', zIndex: 1, perspective: 1200 }}>
-      <div className="glass" style={{ borderRadius: 26, padding: 20, transform: 'rotateY(-8deg) rotateZ(1deg)', transformOrigin: 'center', boxShadow: '0 34px 90px -36px rgba(0,0,0,.85), 0 0 70px -34px rgba(90,99,230,.95)' }}>
+    <div style={{ position: 'relative', zIndex: 1, perspective: 1400 }}>
+      <div className="glass" style={{ borderRadius: 30, padding: 24, minHeight: 530, transform: 'rotateY(-11deg) rotateZ(1.5deg)', transformOrigin: 'center', background: 'linear-gradient(135deg, rgba(255,255,255,.07), rgba(255,255,255,.035))', border: '1px solid rgba(111,132,255,.28)', boxShadow: '0 42px 120px -42px rgba(0,0,0,.9), 0 0 95px -34px rgba(90,99,230,.95), inset 0 1px 0 rgba(255,255,255,.08)' }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
           <div>
             <div className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 5 }}>Live overview</div>

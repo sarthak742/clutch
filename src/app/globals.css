@@ -148,7 +148,8 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
   main section[style*="grid-template-columns"] {
     grid-template-columns: 1fr !important;
   }
-  div[style*="rotateY(-8deg)"] {
+  div[style*="rotateY(-8deg)"],
+  div[style*="rotateY(-11deg)"] {
     transform: none !important;
   }
 }

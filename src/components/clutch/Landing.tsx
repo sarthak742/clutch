@@ -85,31 +85,93 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
 }
 
 function LightTrails() {
+  const paths = [
+    'M 140 330 C 260 250, 360 210, 510 245 S 790 330, 1040 260',
+    'M 120 380 C 300 320, 430 285, 590 320 S 830 410, 1080 340',
+    'M 155 430 C 320 390, 470 360, 625 390 S 850 485, 1095 430',
+    'M 120 490 C 315 465, 455 445, 625 470 S 860 555, 1110 520',
+    'M 165 550 C 350 540, 515 520, 670 540 S 890 620, 1110 610',
+    'M 235 285 C 405 245, 515 235, 660 265 S 845 300, 1050 215',
+    'M 230 610 C 400 615, 530 600, 685 615 S 900 690, 1090 710',
+    'M 175 350 C 360 350, 485 385, 635 420 S 860 435, 1110 370',
+    'M 210 470 C 385 430, 500 405, 650 425 S 900 505, 1115 475',
+  ]
+  const nodes = [
+    [470, 248, '#72b7ff', 3],
+    [610, 319, '#78c8ff', 4],
+    [735, 390, '#e0b15a', 5],
+    [865, 490, '#7bbcff', 3],
+    [520, 544, '#6d7cff', 3],
+    [980, 338, '#81d7ff', 3],
+    [1035, 608, '#e0b15a', 4],
+  ] as const
   return (
-    <div aria-hidden="true" style={{ position: 'absolute', inset: '-8% -4% -2% 24%', zIndex: 0, pointerEvents: 'none', opacity: .98, overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', left: '19%', top: '8%', width: '68%', height: '82%', background: 'radial-gradient(ellipse at 62% 48%, rgba(78,137,255,.24), transparent 58%), radial-gradient(ellipse at 72% 60%, rgba(224,177,90,.13), transparent 46%)', filter: 'blur(12px)' }} />
-      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-        <div
-          key={i}
-          style={{
-            position: 'absolute',
-            left: `${-2 + i * 2.5}%`,
-            top: `${24 + i * 5.4}%`,
-            width: '94%',
-            height: i % 3 === 0 ? 3 : 2,
-            borderRadius: 999,
-            background: `linear-gradient(90deg, transparent 0%, rgba(${i % 2 ? '90,99,230' : '90,178,255'},.08) 18%, rgba(${i % 2 ? '95,112,255' : '92,190,255'},.84) 46%, rgba(224,177,90,.68) 62%, rgba(90,99,230,.18) 76%, transparent 100%)`,
-            transform: `rotate(${i % 2 ? -8 : 5}deg) skewX(-24deg)`,
-            filter: i % 3 === 0 ? 'blur(.6px)' : 'blur(.18px)',
-            boxShadow: '0 0 18px rgba(90,99,230,.55), 0 0 38px rgba(88,185,255,.26)',
-            animation: `trailDrift ${9 + i}s ease-in-out infinite`,
-            animationDelay: `${i * -.9}s`,
-          }}
-        />
-      ))}
-      {[0, 1, 2, 3, 4].map((i) => (
-        <span key={`dot-${i}`} style={{ position: 'absolute', left: `${44 + i * 8}%`, top: `${26 + i * 10}%`, width: i === 2 ? 8 : 5, height: i === 2 ? 8 : 5, borderRadius: '50%', background: i === 2 ? 'var(--warn)' : '#72b7ff', boxShadow: i === 2 ? '0 0 18px 4px rgba(224,177,90,.55)' : '0 0 14px 3px rgba(90,160,255,.45)' }} />
-      ))}
+    <div className="hero-mesh" aria-hidden="true">
+      <svg viewBox="0 0 1200 760" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+        <defs>
+          <radialGradient id="meshCore" cx="55%" cy="48%" r="52%">
+            <stop offset="0%" stopColor="rgba(82,142,255,.32)" />
+            <stop offset="48%" stopColor="rgba(90,99,230,.18)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+          </radialGradient>
+          <linearGradient id="meshBlue" x1="0%" y1="50%" x2="100%" y2="50%">
+            <stop offset="0%" stopColor="rgba(54,101,255,0)" />
+            <stop offset="24%" stopColor="rgba(62,112,255,.2)" />
+            <stop offset="52%" stopColor="rgba(80,190,255,.92)" />
+            <stop offset="78%" stopColor="rgba(107,91,255,.64)" />
+            <stop offset="100%" stopColor="rgba(54,101,255,0)" />
+          </linearGradient>
+          <linearGradient id="meshViolet" x1="0%" y1="50%" x2="100%" y2="50%">
+            <stop offset="0%" stopColor="rgba(89,78,255,0)" />
+            <stop offset="38%" stopColor="rgba(105,91,255,.58)" />
+            <stop offset="66%" stopColor="rgba(195,105,255,.72)" />
+            <stop offset="100%" stopColor="rgba(89,78,255,0)" />
+          </linearGradient>
+          <linearGradient id="meshAmber" x1="0%" y1="50%" x2="100%" y2="50%">
+            <stop offset="0%" stopColor="rgba(224,177,90,0)" />
+            <stop offset="48%" stopColor="rgba(224,177,90,.18)" />
+            <stop offset="70%" stopColor="rgba(224,177,90,.78)" />
+            <stop offset="100%" stopColor="rgba(224,177,90,0)" />
+          </linearGradient>
+          <filter id="meshGlow" x="-35%" y="-80%" width="170%" height="260%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.25 0 0 0 0 0.45 0 0 0 0 1 0 0 0 .9 0" result="glow" />
+            <feMerge>
+              <feMergeNode in="glow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="nodeGlow" x="-300%" y="-300%" width="700%" height="700%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <rect x="0" y="0" width="1200" height="760" fill="url(#meshCore)" opacity=".78" />
+        <g filter="url(#meshGlow)">
+          {paths.map((d, i) => (
+            <path
+              key={d}
+              d={d}
+              className="mesh-path"
+              pathLength="100"
+              stroke={i % 5 === 2 ? 'url(#meshAmber)' : i % 3 === 1 ? 'url(#meshViolet)' : 'url(#meshBlue)'}
+              strokeWidth={i % 4 === 0 ? 2.4 : 1.45}
+              strokeLinecap="round"
+              fill="none"
+              opacity={i % 5 === 2 ? .78 : .88}
+              style={{ animationDelay: `${i * -0.7}s` }}
+            />
+          ))}
+        </g>
+        <g filter="url(#nodeGlow)">
+          {nodes.map(([cx, cy, fill, r], i) => (
+            <circle key={`${cx}-${cy}`} className="mesh-node" cx={cx} cy={cy} r={r} fill={fill} opacity=".95" style={{ animationDelay: `${i * -.5}s` }} />
+          ))}
+        </g>
+      </svg>
     </div>
   )
 }

@@ -92,6 +92,30 @@ body {
     0 0 88px rgba(90, 99, 230, 0.3);
 }
 
+.hero-mesh {
+  position: absolute;
+  left: 25%;
+  right: -6%;
+  top: 7%;
+  bottom: 2%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.96;
+  mix-blend-mode: screen;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 15%, #000 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 15%, #000 88%, transparent 100%);
+}
+
+.mesh-path {
+  stroke-dasharray: 82 18;
+  animation: mesh-flow 9s ease-in-out infinite;
+}
+
+.mesh-node {
+  animation: node-pulse 3.8s ease-in-out infinite;
+}
+
 /* ── Glass + control utilities ── */
 .glass {
   background: var(--glass);
@@ -145,6 +169,8 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
 @keyframes pulse-ring { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
 @keyframes caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes trailDrift { 0%, 100% { opacity: 0.42; transform: translateX(-12px) rotate(7deg) skewX(-18deg); } 50% { opacity: 0.95; transform: translateX(18px) rotate(3deg) skewX(-18deg); } }
+@keyframes mesh-flow { 0%, 100% { stroke-dashoffset: 0; opacity: 0.48; } 45% { opacity: 1; } 50% { stroke-dashoffset: -28; } }
+@keyframes node-pulse { 0%, 100% { opacity: 0.42; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.25); } }
 
 .caret::after {
   content: '▋'; display: inline; animation: caret-blink 0.85s step-end infinite;
@@ -162,7 +188,7 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-  [style*="pulse-ring"], .shimmer { animation: none !important; }
+  [style*="pulse-ring"], .shimmer, .mesh-path, .mesh-node { animation: none !important; }
 }
 
 @media (max-width: 860px) {
@@ -172,5 +198,12 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
   div[style*="rotateY(-8deg)"],
   div[style*="rotateY(-11deg)"] {
     transform: none !important;
+  }
+  .hero-mesh {
+    left: -8%;
+    right: -8%;
+    top: 18%;
+    bottom: 24%;
+    opacity: 0.42;
   }
 }

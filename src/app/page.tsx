@@ -25,7 +25,7 @@ export default function Home() {
     const state = loadClutchState()
     setTasks(state.tasks)
     setFollowThrough(state.followThrough)
-    setView(state.tasks.length === 0 ? 'landing' : 'briefing')
+    setView('landing')
     setReady(true)
   }, [])
 
@@ -82,7 +82,13 @@ export default function Home() {
         <AnimatePresence mode="wait">
           {view === 'landing' && (
             <motion.div key="landing" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
-              <Landing tasks={tasks} followThrough={followThrough} onStart={() => setView('capture')} onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined} />
+              <Landing
+                tasks={tasks}
+                followThrough={followThrough}
+                onStart={() => setView(tasks.length > 0 ? 'briefing' : 'capture')}
+                onAddMore={tasks.length > 0 ? () => setView('capture') : undefined}
+                onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined}
+              />
             </motion.div>
           )}
 

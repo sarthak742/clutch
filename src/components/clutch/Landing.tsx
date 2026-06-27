@@ -9,10 +9,11 @@ interface Props {
   tasks: ClutchTask[]
   followThrough: FollowThrough
   onStart: () => void
+  onAddMore?: () => void
   onLoadDemo?: () => void
 }
 
-export function Landing({ tasks, followThrough, onStart, onLoadDemo }: Props) {
+export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }: Props) {
   const top = rankTasks(tasks, Date.now())[0]
   const stats = overviewStats(tasks, followThrough)
   const followUp = followUpMemory(tasks)
@@ -52,12 +53,12 @@ export function Landing({ tasks, followThrough, onStart, onLoadDemo }: Props) {
 
             <div className="flex flex-wrap gap-3" style={{ marginBottom: 24 }}>
               <button onClick={onStart} className="btn-primary flex items-center justify-center gap-2.5" style={{ padding: '17px 20px', borderRadius: 16, fontSize: 16 }}>
-                <span>Start with my tasks</span>
+                <span>{tasks.length > 0 ? 'Open my dashboard' : 'Start with my tasks'}</span>
                 <ArrowRight size={18} weight="bold" />
               </button>
-              {onLoadDemo && (
-                <button onClick={onLoadDemo} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '17px 18px', borderRadius: 16, fontSize: 16, fontWeight: 700 }}>
-                  <span>See the demo flow</span>
+              {(onLoadDemo || onAddMore) && (
+                <button onClick={onLoadDemo ?? onAddMore} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '17px 18px', borderRadius: 16, fontSize: 16, fontWeight: 700 }}>
+                  <span>{tasks.length > 0 ? 'Add more tasks' : 'See the demo flow'}</span>
                 </button>
               )}
             </div>

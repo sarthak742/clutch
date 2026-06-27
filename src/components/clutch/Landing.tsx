@@ -41,11 +41,11 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
           <LightTrails />
           <div style={{ position: 'relative', zIndex: 1 }}>
             <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>AI accountability companion</span>
-            <h1 className="serif" style={{ fontWeight: 400, fontSize: 'clamp(82px,10.4vw,176px)', lineHeight: .82, letterSpacing: 0, marginBottom: 30, color: '#f6f8ff', textShadow: '0 0 34px rgba(119,159,255,.24), 0 0 90px rgba(90,99,230,.14)' }}>
+            <h1 className="clutch-hero-title" style={{ fontSize: 'clamp(88px,10.8vw,184px)', marginBottom: 30 }}>
               CLUTCH
             </h1>
-            <p style={{ fontSize: 'clamp(28px,2.8vw,46px)', lineHeight: 1.12, color: 'rgba(243,245,244,.94)', maxWidth: '18ch', marginBottom: 22, fontWeight: 700 }}>
-              The app that steps in before your deadline slips.
+            <p style={{ fontSize: 'clamp(28px,2.8vw,46px)', lineHeight: 1.12, color: 'rgba(243,245,244,.94)', maxWidth: '18ch', marginBottom: 22, fontWeight: 800 }}>
+              The app that steps in before your <span className="hero-blue-phrase">deadline slips.</span>
             </p>
             <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--dim)', maxWidth: '43ch', marginBottom: 34 }}>
               Dump the mess. Clutch finds the riskiest commitment, asks what matters, starts the smallest useful move, and verifies proof before it gives you credit.

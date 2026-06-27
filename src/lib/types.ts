@@ -46,6 +46,7 @@ export interface CommitmentOutcome {
   proofImage?: string
   offTaskSeconds?: number
   leftTabCount?: number
+  reviewVerdict?: 'accepted' | 'partial' | 'rejected'
   reviewSolid?: boolean
   reviewReaction?: string
   at: number

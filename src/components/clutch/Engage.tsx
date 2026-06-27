@@ -194,13 +194,22 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
       const payload = (await res.json()) as ProofReview | { error: string }
       if (res.ok && !('error' in payload)) result = payload
     } catch { /* neutral logging */ }
+    if (!result) {
+      result = {
+        reaction: 'I could not verify this proof, so I am not marking the commitment complete. Show the actual task-matched artifact and review again.',
+        nextNudge: 'Paste or attach concrete evidence for this exact commitment.',
+        verdict: 'rejected',
+        solid: false,
+      }
+    }
     setReview(result)
 
     const hiddenDelta = hiddenStartedAt.current ? Math.max(1, Math.round((Date.now() - hiddenStartedAt.current) / 1000)) : 0
     const finalOffTaskSeconds = offTaskSecondsRef.current + hiddenDelta
     hiddenStartedAt.current = null
-    const outcome: CommitmentOutcome = { status, proof: proofText.trim() || undefined, proofImage: proofImage ?? undefined, offTaskSeconds: finalOffTaskSeconds, leftTabCount: leftTabCountRef.current, reviewSolid: result?.solid, reviewReaction: result?.reaction, at: Date.now() }
-    const solid = result ? result.solid : true
+    const verdict = result.verdict === 'accepted' && result.solid ? 'accepted' : result.verdict === 'partial' ? 'partial' : 'rejected'
+    const outcome: CommitmentOutcome = { status, proof: proofText.trim() || undefined, proofImage: proofImage ?? undefined, offTaskSeconds: finalOffTaskSeconds, leftTabCount: leftTabCountRef.current, reviewVerdict: verdict, reviewSolid: verdict === 'accepted', reviewReaction: result.reaction, at: Date.now() }
+    const solid = verdict === 'accepted'
     const counted = status === 'done' && solid && !countedRef.current
     onUpdateTask(task.id, {
       commitments: task.commitments.map((c) => (c.id === commitmentId.current ? { ...c, offTaskSeconds: finalOffTaskSeconds, leftTabCount: leftTabCountRef.current, outcome } : c)),
@@ -225,7 +234,10 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const updateAnswer = (i: number, v: string) => setAnswers((a) => a.map((x, j) => (j === i ? v : x)))
   const artifactLines = (plan?.artifact ?? '').split('\n').map((l) => l.replace(/^[\s>*\-•\d.]+/, '').trim()).filter(Boolean)
   const cur = stepIndex(step)
-  const solid = review ? review.solid : true
+  const reviewVerdict = review?.verdict === 'accepted' && review.solid ? 'accepted' : review?.verdict === 'partial' ? 'partial' : 'rejected'
+  const solid = reviewVerdict === 'accepted'
+  const verdictLabel = reviewVerdict === 'accepted' ? 'Accepted' : reviewVerdict === 'partial' ? 'Partial' : 'Rejected'
+  const verdictTone = reviewVerdict === 'accepted' ? 'var(--good)' : reviewVerdict === 'partial' ? 'var(--warn)' : 'var(--bad, #ff7a7a)'
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 clamp(20px,5vw,40px)' }}>
@@ -464,12 +476,12 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
         {/* DONE — reaction */}
         {step === 'done' && (
           <div className="flex flex-col justify-center" style={{ animation: 'stepIn .55s cubic-bezier(.2,.65,.25,1) both', flex: 1 }}>
-            <div className="glass" style={{ borderRadius: 24, padding: 26, border: `1px solid ${solid ? 'rgba(127,174,122,.4)' : 'rgba(224,177,90,.4)'}` }}>
-              <div className="inline-flex items-center gap-2" style={{ padding: '6px 12px', borderRadius: 999, background: solid ? 'rgba(127,174,122,.14)' : 'rgba(224,177,90,.14)', marginBottom: 18 }}>
-                {solid ? <CheckCircle size={15} weight="fill" style={{ color: 'var(--good)' }} /> : <Warning size={15} weight="fill" style={{ color: 'var(--warn)' }} />}
-                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', color: solid ? 'var(--good)' : 'var(--warn)' }}>{solid ? 'Logged' : 'Not so fast'}</span>
+            <div className="glass" style={{ borderRadius: 24, padding: 26, border: `1px solid ${solid ? 'rgba(127,174,122,.4)' : reviewVerdict === 'partial' ? 'rgba(224,177,90,.4)' : 'rgba(255,122,122,.38)'}` }}>
+              <div className="inline-flex items-center gap-2" style={{ padding: '6px 12px', borderRadius: 999, background: solid ? 'rgba(127,174,122,.14)' : reviewVerdict === 'partial' ? 'rgba(224,177,90,.14)' : 'rgba(255,122,122,.12)', marginBottom: 18 }}>
+                {solid ? <CheckCircle size={15} weight="fill" style={{ color: 'var(--good)' }} /> : <Warning size={15} weight="fill" style={{ color: verdictTone }} />}
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', color: verdictTone }}>{verdictLabel}</span>
               </div>
-              <h2 className="serif" style={{ fontSize: 28, fontWeight: 400, lineHeight: 1.18, marginBottom: 14 }}>{review?.reaction ?? 'Logged. That&apos;s on the record.'}</h2>
+              <h2 className="serif" style={{ fontSize: 28, fontWeight: 400, lineHeight: 1.18, marginBottom: 14 }}>{review?.reaction ?? 'Not verified. Show concrete proof for this exact task.'}</h2>
               {review?.nextNudge && <p style={{ fontSize: 15.5, lineHeight: 1.6, color: 'var(--dim)' }}>Next: {review.nextNudge}</p>}
             </div>
 

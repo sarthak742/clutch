@@ -1,62 +1,113 @@
-# CLUTCH
+# CLUTCH — AI Accountability Companion
 
-CLUTCH is an AI accountability companion for the Vibe2Ship hackathon, Problem Statement 1: "The Last-Minute Life Saver."
+> **Vibe2Ship Hackathon Submission**  
+> **Problem Statement 1:** The Last-Minute Life Saver  
+> **Target Deployment:** Google Cloud Run  
+> **Core Model:** Gemini 2.5 Flash via `@google/genai`  
 
-It is not a passive to-do list. It takes a messy brain dump, identifies what is most likely to blow up, asks task-specific scope questions, generates a concrete first move with Gemini, starts a commitment timer, and then asks for proof before marking the work complete.
+---
 
-The core loop uses an agentic pipeline rather than a free-running autonomous agent: deterministic triage and state transitions keep the demo reliable, while full behavioral memory is fed to Gemini for diagnosis, artifact generation, proof review, and a visible audit trail. An optional "Plan my day" action demonstrates real Gemini function calling in an isolated path.
+## 💡 Solution Overview & Product Philosophy
 
-## Why It Exists
+People do not usually miss important deadlines because they forgot the task existed. They miss them because the task is vague, intimidating, or easy to procrastinate on when nobody is watching. Existing productivity tools rely on **passive reminders**—notifications that are trivial to swipe away and do nothing to help you actually start or finish the work.
 
-People do not usually miss important work because they forgot it exists. They miss it because it is vague, intimidating, boring, or easy to delay when nobody is checking. CLUTCH creates a lightweight accountability loop:
+**CLUTCH** is a proactive AI accountability companion that moves beyond reminders into meaningful action. It acts as an active partner: it triages your messy workload, diagnoses *why* you are avoiding specific tasks, generates tailored starting points to remove friction, and holds you to a **proof-based verification loop**. You cannot simply check a box to mark a task done; you must show the work, and the AI will verify it.
 
-- dump everything on your mind
-- let Gemini parse and triage the risk
-- scope the highest-risk task
-- get the work started with a task-specific artifact
-- commit to a timed action
-- show text or image proof
-- get an honest Gemini review
+To ensure absolute reliability for live demos and production usage, CLUTCH uses a **hybrid architecture**: a deterministic product spine for state transitions, navigation, and time-tracking, combined with LLM reasoning for behavioral diagnosis, artifact generation, multimodal proof review, and proactive planning.
 
-## Tech Stack
+---
 
-- Next.js App Router
-- TypeScript
-- Tailwind CSS v4
-- Motion for React
-- Phosphor Icons
-- Google Gemini via `@google/genai`
-- Cloud Run-ready Dockerfile
+## 🛠️ Key Features
 
-## Google Technologies
+### 1. The Proactive Morning Briefing
+Before you even look at your tasks, CLUTCH generates a time-aware morning digest. Using Gemini, it analyzes your active workload, outstanding proofs, and historical follow-through rate to write a candid greeting, highlight your single highest-risk item, and deliver a concrete starting nudge.
+*   **Google Tech:** Gemini 2.5 Flash text generation.
+*   **UI Screen:** `Morning Briefing` sidebar tab.
 
-- Gemini 2.5 Flash for brain-dump parsing, scope questions, action generation, and proof review
-- Visible agent audit trail built from behavioral memory and deterministic pipeline steps
-- Optional Gemini function-calling round trip for day planning
-- Google Cloud Run target deployment
+### 2. Messy Brain-Dump Parser
+Write your mind in plain, unformatted language (e.g., *"need to submit the slides by tomorrow night, also call the dentist sometime, and finish the cloud run deployment before 2pm"*). CLUTCH uses Gemini to structure this stream into distinct tasks with inferred deadlines, category tags, and effort estimates.
+*   **Google Tech:** Structured JSON output (`responseMimeType: 'application/json'` + `responseSchema`).
+*   **UI Screen:** `Brain Dump` inbox.
 
-## Local Development
+### 3. Smart Risk Triage Dashboard
+Tasks are ranked using a custom triage engine that calculates a real-time risk score based on:
+$$\text{Risk Score} = \text{Deadline Proximity} \times \text{Effort Remaining} \times \text{Avoidance Signals}$$
+Avoidance signals track how many times you have deferred the task or opened it and bailed without committing.
+*   **UI Screen:** `Dashboard` (with live statistics: Follow-Through %, Accepted Proofs, Off-Task Minutes, Rescued Tasks).
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
+### 4. Autonomous Intervention Router
+When you engage a task, CLUTCH doesn't force you through a generic setup. An agentic router analyzes the task's behavioral history and selects the lowest-friction intervention path:
+*   `scope_first`: For new or vague tasks. Clutch asks 2–4 highly specific, task-targeted questions to clarify requirements.
+*   `resume`: For tasks with prior progress or rejected proofs. Skips scoping and prompts you to resume from the existing artifact and address the previous review feedback.
+*   `quick_start`: For heavily avoided tasks (3+ deferrals/bailouts). Skips questions entirely, generates a tiny action, and suggests a 5-minute commitment to break the friction barrier.
+*   **Google Tech:** Gemini-driven decision routing + behavioral memory.
+
+### 5. Grounded Action Plans
+Based on your scoping answers or intervention path, CLUTCH generates a concrete, customized starting artifact (e.g., an outline, a code template, a step-by-step plan). If the task involves research, study, or technical documentation, CLUTCH enables Google Search Grounding to attach real-world reference sources with clickable citations.
+*   **Google Tech:** Google Search Grounding (`tools: [{ googleSearch: {} }]`).
+
+### 6. Focus Timer & Google Calendar Handoff
+Once you agree to a plan, you commit to a specific duration. CLUTCH generates a dynamic Google Calendar focus block link pre-filled with your task details and commitment action, letting you block your schedule in one click. The app then starts a countdown timer and monitors your focus.
+*   **Focus Monitoring:** CLUTCH tracks tab-visibility changes. If you switch tabs or leave the app, it counts your off-task seconds and logs how many times you bailed, presenting an honest focus report at the end.
+*   **Google Tech:** Google Calendar template API.
+
+### 7. Multimodal Proof Gate
+To complete a commitment, you must submit evidence. You can paste the text you wrote, insert a link, or upload/drag-and-drop a screenshot of your work. Gemini reviews the proof against the original commitment and issues a verdict:
+*   `accepted`: The proof matches the commitment. Task status updates.
+*   `partial`: Progress was made, but the core commitment is incomplete.
+*   `rejected`: The proof is vague, unrelated, or represents prompt injection.
+*   **Google Tech:** Multimodal Gemini input (inline image data + text).
+
+### 8. Post-Proof Re-Evaluation Loop
+If your proof is marked `partial` or `rejected`, CLUTCH does not just drop you. The agent immediately re-evaluates your updated task state and behavioral signals to decide the next recovery move (e.g., recommending a quick 5-minute retry, resuming the current artifact, or routing back to re-scoping questions to identify blockers).
+*   **Google Tech:** Agentic re-evaluation loop.
+
+---
+
+## 🧠 Agentic Depth & Architecture
+
+Rather than a black-box autonomous agent that is prone to looping or failing silently, CLUTCH exposes its agentic reasoning directly to the user through a **Visible Agent Audit Trail**. Every major action shows the exact tools called and the step-by-step reasoning:
+
+```mermaid
+graph TD
+    A[Brain Dump / Tasks] --> B[Risk Triage Engine]
+    B -->|Select Task| C[Choose Intervention Router]
+    C -->|scope_first| D[Scope Questions]
+    C -->|resume| E[Resume Prior Attempt]
+    C -->|quick_start| F[Quick 5-Min Action]
+    D & E & F --> G[Generate Action Plan + Grounding]
+    G --> H[Commit + Calendar Handoff]
+    H --> I[Focus Timer + Tab Tracking]
+    I --> J[Submit Proof: Text / Image]
+    J --> K[Multimodal Proof Review]
+    K -->|Accepted| L[Mark Done]
+    K -->|Partial / Rejected| M[Post-Proof Re-Evaluation]
+    M -->|Decide Recovery| C
 ```
 
-Set `FOCUS_AGENT_GEMINI_KEY` in `.env.local`.
+### Demonstration of Core Agentic Capabilities:
+1.  **Autonomous Decision Making:** The agent decides the intervention strategy (`chooseIntervention`) and the post-proof recovery path based on behavioral history.
+2.  **Function Calling:** The isolated `Day Plan` screen uses Gemini SDK `functionDeclarations` to execute a local tool (`prioritizeDay` with a time budget) and summarizes the result.
+3.  **Grounding:** Conditionally queries Google Search Grounding when tasks require factual, up-to-date, or research-based actions.
+4.  **Multimodal Reasoning:** Visually inspects uploaded screenshots to verify that the user's proof matches their committed action.
+5.  **Resilience & Fallbacks:** Every Gemini call is wrapped in a resilience handler (`withGeminiResilience`) that automatically retries twice on transient errors and times out at 22 seconds, falling back to local deterministic algorithms to guarantee a flawless user experience.
 
-## Validation
+---
 
-```bash
-npx tsc --noEmit
-npx next build
-```
+## 💻 Tech Stack & Credits
 
-## Credits
+### Core Stack:
+*   **Framework:** Next.js (App Router, React 19)
+*   **Language:** TypeScript
+*   **Styling:** Tailwind CSS v4 + Vanilla CSS custom design system (glassmorphism, CSS-only animations, fluid typography)
+*   **Motion:** Motion for React (framer-motion)
+*   **Icons:** Phosphor Icons
 
-- Next.js and React for the application framework
-- Tailwind CSS for styling
-- Motion for React for interface motion
-- Phosphor Icons for iconography
-- `@google/genai` for Gemini integration
-- 21st.dev Silk background inspiration for the atmospheric animated backdrop
+### Google Tech Stack:
+*   **SDK:** `@google/genai` (utilizing `gemini-2.5-flash`)
+*   **APIs:** Google Calendar Template API
+*   **Deployment:** Google Cloud Run (Docker multi-stage build)
+
+### Credits & Inspirations:
+*   **Background:** Atmospheric animated backdrop inspired by the 21st.dev Silk animation.
+*   **Design Philosophy:** Clean, premium developer-tool aesthetic utilizing a dark palette, high-contrast typography, and explicit micro-animations.

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, WarningOctagon, ArrowRight, CalendarX, HourglassMedium, ArrowUUpLeft, MoonStars } from '@phosphor-icons/react'
+import { Plus, WarningOctagon, ArrowRight, CalendarX, HourglassMedium, ArrowUUpLeft, MoonStars, ChartLineUp, BellRinging } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
 import { deadlineLabel, EFFORT_LABEL } from '@/lib/task'
@@ -28,6 +28,8 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
   const ranked = rankTasks(tasks, now)
   const top = ranked[0]
   const rest = ranked.slice(1)
+  const analytics = briefingAnalytics(tasks, followThrough)
+  const followUp = followUpMemory(tasks)
 
   const rate =
     followThrough.committed > 0
@@ -81,6 +83,34 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
           </div>
         ) : (
           <div className="flex flex-col justify-center" style={{ flex: 1, paddingTop: 24, paddingBottom: 12 }}>
+            <div className="glass" style={{ borderRadius: 20, padding: 14, marginBottom: 14 }}>
+              <div className="flex items-center gap-2" style={{ marginBottom: 12 }}>
+                <ChartLineUp size={16} weight="fill" style={{ color: 'var(--accent)' }} />
+                <span className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--faint)' }}>Accountability dashboard</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 8 }}>
+                <Metric label="follow-through" value={analytics.followThrough} tone={analytics.followThroughRaw >= 60 ? 'var(--good)' : 'var(--warn)'} />
+                <Metric label="accepted" value={String(analytics.accepted)} tone="var(--good)" />
+                <Metric label="off-task" value={`${analytics.offTaskMinutes}m`} tone={analytics.offTaskMinutes > 0 ? 'var(--warn)' : 'var(--faint)'} />
+                <Metric label="rescued" value={String(analytics.rescued)} tone="var(--accent)" />
+              </div>
+            </div>
+
+            {followUp && (
+              <button
+                onClick={() => onEngage(followUp.task.id)}
+                className="glass flex items-start gap-3 text-left"
+                style={{ borderRadius: 20, padding: 15, marginBottom: 14, color: 'inherit', cursor: 'pointer' }}
+              >
+                <BellRinging size={20} weight="fill" style={{ color: 'var(--warn)', flexShrink: 0, marginTop: 1 }} />
+                <div style={{ flex: 1 }}>
+                  <div className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--warn)', marginBottom: 5 }}>Pick up where you left off</div>
+                  <div style={{ fontSize: 14.5, lineHeight: 1.45, color: 'rgba(243,245,244,.86)' }}>{followUp.message}</div>
+                </div>
+                <ArrowRight size={16} weight="bold" style={{ color: 'var(--faint)', flexShrink: 0, marginTop: 2 }} />
+              </button>
+            )}
+
             {/* Hero */}
             <div
               style={{
@@ -189,6 +219,15 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
   )
 }
 
+function Metric({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div style={{ borderRadius: 14, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.07)', padding: '10px 9px', minWidth: 0 }}>
+      <div className="mono" style={{ fontSize: 10, color: 'var(--faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 5 }}>{label}</div>
+      <div style={{ fontSize: 18, lineHeight: 1, fontWeight: 800, color: tone }}>{value}</div>
+    </div>
+  )
+}
+
 function Chip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div className="inline-flex items-center gap-1.5" style={{ padding: '6px 11px', borderRadius: 999, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', fontSize: 12.5, color: 'rgba(243,245,244,.72)' }}>
@@ -196,4 +235,44 @@ function Chip({ icon, label }: { icon: React.ReactNode; label: string }) {
       <span>{label}</span>
     </div>
   )
+}
+
+function briefingAnalytics(tasks: ClutchTask[], followThrough: FollowThrough) {
+  const outcomes = tasks.flatMap((task) => task.commitments.map((commitment) => ({ task, commitment, outcome: commitment.outcome })).filter((item) => item.outcome))
+  const accepted = outcomes.filter((item) => item.outcome?.reviewVerdict === 'accepted' || item.outcome?.reviewSolid).length
+  const offTaskMinutes = Math.ceil(outcomes.reduce((sum, item) => sum + (item.outcome?.offTaskSeconds ?? item.commitment.offTaskSeconds ?? 0), 0) / 60)
+  const rescued = tasks.filter((task) => task.status === 'done' && task.deferralCount > 0).length
+  const followThroughRaw = followThrough.committed > 0 ? Math.round((followThrough.completed / followThrough.committed) * 100) : 0
+  return {
+    followThroughRaw,
+    followThrough: followThrough.committed > 0 ? `${followThroughRaw}%` : '--',
+    accepted,
+    offTaskMinutes,
+    rescued,
+  }
+}
+
+function followUpMemory(tasks: ClutchTask[]): { task: ClutchTask; message: string } | null {
+  const now = Date.now()
+  const unfinished = tasks
+    .filter((task) => task.status !== 'done' && task.commitments.length > 0)
+    .map((task) => {
+      const latest = [...task.commitments].sort((a, b) => b.committedAt - a.committedAt)[0]
+      return { task, latest }
+    })
+    .filter((item) => now - item.latest.committedAt > 30 * 60_000)
+    .sort((a, b) => b.latest.committedAt - a.latest.committedAt)[0]
+
+  if (!unfinished) return null
+  const hours = Math.max(1, Math.round((now - unfinished.latest.committedAt) / 3_600_000))
+  const review = unfinished.latest.outcome?.reviewVerdict
+  const suffix = review === 'partial'
+    ? 'It was marked partial. Want to close the gap now?'
+    : review === 'rejected'
+      ? 'The proof was rejected. Want to show stronger evidence now?'
+      : 'Want to finish it before it slips again?'
+  return {
+    task: unfinished.task,
+    message: `${hours}h ago you committed to "${unfinished.latest.action}" for "${unfinished.task.title}". ${suffix}`,
+  }
 }

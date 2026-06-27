@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { ArrowLeft, ArrowRight, MagicWand, Timer, Play, Pause, Paperclip, Image as ImageIcon, CheckCircle, Eye, Warning } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, MagicWand, Timer, Play, Pause, Paperclip, Image as ImageIcon, CheckCircle, Eye, Warning, CalendarPlus } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough, Commitment, CommitmentOutcome } from '@/lib/types'
 import type { ActionPlan, QAPair, ProofReview } from '@/lib/gemini'
 
@@ -34,6 +34,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const [leftNotice, setLeftNotice] = useState(false)
   const [offTaskSeconds, setOffTaskSeconds] = useState(0)
   const [leftTabCount, setLeftTabCount] = useState(0)
+  const [focusBlockUrl, setFocusBlockUrl] = useState<string | null>(null)
   const commitmentId = useRef<string | null>(null)
   const pendingStatus = useRef<CommitmentOutcome['status']>('done')
   const countedRef = useRef(false)
@@ -148,8 +149,11 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
 
   const commit = () => {
     if (!plan) return
-    const c: Commitment = { id: crypto.randomUUID(), action: plan.suggestedAction, durationMin: minutes, committedAt: Date.now(), offTaskSeconds: 0, leftTabCount: 0 }
+    const committedAt = Date.now()
+    const nextFocusBlockUrl = calendarFocusBlockUrl(task.title, plan.suggestedAction, committedAt, minutes)
+    const c: Commitment = { id: crypto.randomUUID(), action: plan.suggestedAction, durationMin: minutes, committedAt, focusBlockUrl: nextFocusBlockUrl, offTaskSeconds: 0, leftTabCount: 0 }
     commitmentId.current = c.id
+    setFocusBlockUrl(nextFocusBlockUrl)
     hiddenStartedAt.current = null
     offTaskSecondsRef.current = 0
     leftTabCountRef.current = 0
@@ -424,6 +428,12 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                 <span>I&apos;m done</span><ArrowRight size={16} weight="bold" />
               </button>
             </div>
+            {focusBlockUrl && (
+              <a href={focusBlockUrl} target="_blank" rel="noreferrer" className="btn-ghost flex items-center justify-center gap-2" style={{ marginTop: 12, width: '100%', maxWidth: 340, padding: 13, borderRadius: 14, fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>
+                <CalendarPlus size={17} weight="bold" />
+                <span>Add focus block to Calendar</span>
+              </a>
+            )}
             <button onClick={() => finish('skipped')} style={{ marginTop: 14, background: 'none', border: 'none', color: 'var(--faint)', fontSize: 13, cursor: 'pointer' }}>I didn&apos;t get to it</button>
           </div>
         )}
@@ -496,4 +506,17 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
       </div>
     </div>
   )
+}
+
+function calendarFocusBlockUrl(taskTitle: string, action: string, startMs: number, durationMin: number): string {
+  const start = new Date(startMs)
+  const end = new Date(startMs + durationMin * 60_000)
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `Focus block: ${taskTitle}`,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `CLUTCH commitment: ${action}\n\nBring back proof before marking this done.`,
+  })
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
 }

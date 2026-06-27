@@ -57,6 +57,7 @@ export interface Commitment {
   action: string
   durationMin: number
   committedAt: number
+  focusBlockUrl?: string
   offTaskSeconds?: number
   leftTabCount?: number
   outcome?: CommitmentOutcome

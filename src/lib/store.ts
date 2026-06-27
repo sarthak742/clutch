@@ -59,6 +59,7 @@ function migrateTask(raw: unknown): ClutchTask | null {
     progressNotes: Array.isArray(task.progressNotes) ? task.progressNotes.filter((n): n is string => typeof n === 'string') : [],
     blocker: task.blocker,
     artifact: typeof task.artifact === 'string' ? task.artifact : undefined,
+    groundedSources: Array.isArray(task.groundedSources) ? task.groundedSources.filter((s) => s && typeof s.title === 'string' && typeof s.uri === 'string') : [],
     agentTrace: Array.isArray(task.agentTrace) ? task.agentTrace.filter((i) => i && typeof i.label === 'string' && typeof i.detail === 'string') : [],
     commitments: Array.isArray(task.commitments) ? task.commitments : [],
   }

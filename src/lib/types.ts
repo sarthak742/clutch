@@ -81,6 +81,7 @@ export interface ClutchTask {
   blocker?: BlockerKind
   /** The produced plan / draft / first step. */
   artifact?: string
+  groundedSources?: GroundedSource[]
   agentTrace?: AgentTraceItem[]
   commitments: Commitment[]
 }
@@ -88,6 +89,11 @@ export interface ClutchTask {
 export interface AgentTraceItem {
   label: string
   detail: string
+}
+
+export interface GroundedSource {
+  title: string
+  uri: string
 }
 
 /** Raw shape returned by the brain-dump parser before we hydrate to ClutchTask. */

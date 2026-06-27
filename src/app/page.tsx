@@ -82,7 +82,7 @@ export default function Home() {
         <AnimatePresence mode="wait">
           {view === 'landing' && (
             <motion.div key="landing" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
-              <Landing onStart={() => setView('capture')} onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined} />
+              <Landing tasks={tasks} followThrough={followThrough} onStart={() => setView('capture')} onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined} />
             </motion.div>
           )}
 

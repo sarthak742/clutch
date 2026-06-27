@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, WarningOctagon, ArrowRight, CalendarX, HourglassMedium, ArrowUUpLeft, MoonStars, ChartLineUp, BellRinging } from '@phosphor-icons/react'
+import { Plus, WarningOctagon, ArrowRight, CalendarX, HourglassMedium, ArrowUUpLeft, MoonStars, ChartLineUp, BellRinging, ShieldCheck, LinkSimple, CalendarPlus } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
 import { deadlineLabel, EFFORT_LABEL } from '@/lib/task'
 import type { DayPlan } from '@/lib/gemini'
+import { followUpMemory, latestFocusBlock, latestGroundedSources, overviewStats } from '@/lib/overview'
 
 interface Props {
   tasks: ClutchTask[]
@@ -28,8 +29,10 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
   const ranked = rankTasks(tasks, now)
   const top = ranked[0]
   const rest = ranked.slice(1)
-  const analytics = briefingAnalytics(tasks, followThrough)
-  const followUp = followUpMemory(tasks)
+  const analytics = overviewStats(tasks, followThrough)
+  const followUp = followUpMemory(tasks, now)
+  const focusBlock = latestFocusBlock(tasks)
+  const grounded = latestGroundedSources(tasks)
 
   const rate =
     followThrough.committed > 0
@@ -110,6 +113,58 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
                 <ArrowRight size={16} weight="bold" style={{ color: 'var(--faint)', flexShrink: 0, marginTop: 2 }} />
               </button>
             )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, marginBottom: 14 }}>
+              <MiniPanel
+                icon={<ShieldCheck size={18} weight="fill" />}
+                label="Proof verdicts"
+                title={`${analytics.accepted} accepted · ${analytics.partial} partial · ${analytics.rejected} rejected`}
+                detail="Completion only counts when proof matches the task."
+                tone="var(--good)"
+              />
+              {grounded ? (
+                <div className="glass" style={{ borderRadius: 18, padding: 14 }}>
+                  <div className="flex items-center gap-2" style={{ marginBottom: 8, color: 'var(--accent)' }}>
+                    <LinkSimple size={18} weight="bold" />
+                    <span className="mono" style={{ fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase' }}>Grounded refs</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.35, marginBottom: 7 }}>{grounded.task.title}</div>
+                  <div className="flex flex-col" style={{ gap: 5 }}>
+                    {grounded.sources.map((source, i) => (
+                      <a key={`${source.uri}-${i}`} href={source.uri} target="_blank" rel="noreferrer" style={{ color: 'var(--dim)', fontSize: 12.5, lineHeight: 1.35, textDecoration: 'none', overflowWrap: 'anywhere' }}>
+                        [{i + 1}] {source.title}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <MiniPanel
+                  icon={<LinkSimple size={18} weight="bold" />}
+                  label="Grounded refs"
+                  title="No sources yet"
+                  detail="Reference-heavy plans show citations after Gemini Search grounding runs."
+                  tone="var(--accent)"
+                />
+              )}
+              {focusBlock ? (
+                <a href={focusBlock.commitment.focusBlockUrl} target="_blank" rel="noreferrer" className="glass" style={{ borderRadius: 18, padding: 14, color: 'inherit', textDecoration: 'none' }}>
+                  <div className="flex items-center gap-2" style={{ marginBottom: 8, color: 'var(--accent)' }}>
+                    <CalendarPlus size={18} weight="bold" />
+                    <span className="mono" style={{ fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase' }}>Focus block</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.35, marginBottom: 7 }}>{focusBlock.commitment.durationMin} min calendar handoff</div>
+                  <div style={{ color: 'var(--dim)', fontSize: 12.5, lineHeight: 1.45 }}>{focusBlock.commitment.action}</div>
+                </a>
+              ) : (
+                <MiniPanel
+                  icon={<CalendarPlus size={18} weight="bold" />}
+                  label="Focus block"
+                  title="Ready on commit"
+                  detail="Starting a timer creates a Google Calendar handoff link."
+                  tone="var(--accent)"
+                />
+              )}
+            </div>
 
             {/* Hero */}
             <div
@@ -228,6 +283,19 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: st
   )
 }
 
+function MiniPanel({ icon, label, title, detail, tone }: { icon: React.ReactNode; label: string; title: string; detail: string; tone: string }) {
+  return (
+    <div className="glass" style={{ borderRadius: 18, padding: 14 }}>
+      <div className="flex items-center gap-2" style={{ marginBottom: 8, color: tone }}>
+        {icon}
+        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase' }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.35, marginBottom: 7 }}>{title}</div>
+      <div style={{ color: 'var(--dim)', fontSize: 12.5, lineHeight: 1.45 }}>{detail}</div>
+    </div>
+  )
+}
+
 function Chip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div className="inline-flex items-center gap-1.5" style={{ padding: '6px 11px', borderRadius: 999, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', fontSize: 12.5, color: 'rgba(243,245,244,.72)' }}>
@@ -235,44 +303,4 @@ function Chip({ icon, label }: { icon: React.ReactNode; label: string }) {
       <span>{label}</span>
     </div>
   )
-}
-
-function briefingAnalytics(tasks: ClutchTask[], followThrough: FollowThrough) {
-  const outcomes = tasks.flatMap((task) => task.commitments.map((commitment) => ({ task, commitment, outcome: commitment.outcome })).filter((item) => item.outcome))
-  const accepted = outcomes.filter((item) => item.outcome?.reviewVerdict === 'accepted' || item.outcome?.reviewSolid).length
-  const offTaskMinutes = Math.ceil(outcomes.reduce((sum, item) => sum + (item.outcome?.offTaskSeconds ?? item.commitment.offTaskSeconds ?? 0), 0) / 60)
-  const rescued = tasks.filter((task) => task.status === 'done' && task.deferralCount > 0).length
-  const followThroughRaw = followThrough.committed > 0 ? Math.round((followThrough.completed / followThrough.committed) * 100) : 0
-  return {
-    followThroughRaw,
-    followThrough: followThrough.committed > 0 ? `${followThroughRaw}%` : '--',
-    accepted,
-    offTaskMinutes,
-    rescued,
-  }
-}
-
-function followUpMemory(tasks: ClutchTask[]): { task: ClutchTask; message: string } | null {
-  const now = Date.now()
-  const unfinished = tasks
-    .filter((task) => task.status !== 'done' && task.commitments.length > 0)
-    .map((task) => {
-      const latest = [...task.commitments].sort((a, b) => b.committedAt - a.committedAt)[0]
-      return { task, latest }
-    })
-    .filter((item) => now - item.latest.committedAt > 30 * 60_000)
-    .sort((a, b) => b.latest.committedAt - a.latest.committedAt)[0]
-
-  if (!unfinished) return null
-  const hours = Math.max(1, Math.round((now - unfinished.latest.committedAt) / 3_600_000))
-  const review = unfinished.latest.outcome?.reviewVerdict
-  const suffix = review === 'partial'
-    ? 'It was marked partial. Want to close the gap now?'
-    : review === 'rejected'
-      ? 'The proof was rejected. Want to show stronger evidence now?'
-      : 'Want to finish it before it slips again?'
-  return {
-    task: unfinished.task,
-    message: `${hours}h ago you committed to "${unfinished.latest.action}" for "${unfinished.task.title}". ${suffix}`,
-  }
 }

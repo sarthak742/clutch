@@ -1,15 +1,26 @@
 'use client'
 
-import { ArrowRight, Brain, CheckCircle, ClockCountdown, ShieldCheck } from '@phosphor-icons/react'
+import { ArrowRight, Brain, CalendarPlus, CheckCircle, ClockCountdown, LinkSimple, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
+import type { ClutchTask, FollowThrough } from '@/lib/types'
+import { rankTasks } from '@/lib/triage'
+import { followUpMemory, latestFocusBlock, latestGroundedSources, overviewStats } from '@/lib/overview'
 
 interface Props {
+  tasks: ClutchTask[]
+  followThrough: FollowThrough
   onStart: () => void
   onLoadDemo?: () => void
 }
 
-export function Landing({ onStart, onLoadDemo }: Props) {
+export function Landing({ tasks, followThrough, onStart, onLoadDemo }: Props) {
+  const top = rankTasks(tasks, Date.now())[0]
+  const stats = overviewStats(tasks, followThrough)
+  const followUp = followUpMemory(tasks)
+  const focusBlock = latestFocusBlock(tasks)
+  const grounded = latestGroundedSources(tasks)
+
   return (
-    <main style={{ maxWidth: 1180, margin: '0 auto', padding: '0 clamp(20px,4vw,56px)' }}>
+    <main style={{ maxWidth: 1240, margin: '0 auto', padding: '0 clamp(20px,4vw,56px)' }}>
       <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '30px 0 34px', animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both' }}>
         <header className="flex items-center justify-between gap-4" style={{ paddingTop: 8 }}>
           <div className="flex items-center gap-3">
@@ -25,8 +36,9 @@ export function Landing({ onStart, onLoadDemo }: Props) {
           )}
         </header>
 
-        <section style={{ flex: 1, display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(320px,.95fr)', gap: 'clamp(34px,5vw,78px)', alignItems: 'center', padding: '34px 0 20px' }}>
-          <div>
+        <section style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0,.92fr) minmax(360px,1.08fr)', gap: 'clamp(34px,5vw,82px)', alignItems: 'center', padding: '34px 0 20px' }}>
+          <LightTrails />
+          <div style={{ position: 'relative', zIndex: 1 }}>
             <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>AI accountability companion</span>
             <h1 className="serif" style={{ fontWeight: 400, fontSize: 'clamp(58px,8vw,112px)', lineHeight: .92, letterSpacing: 0, marginBottom: 24 }}>
               CLUTCH
@@ -64,39 +76,103 @@ export function Landing({ onStart, onLoadDemo }: Props) {
             </div>
           </div>
 
-          <div className="glass" style={{ borderRadius: 24, padding: 22, alignSelf: 'center' }}>
-            <div className="flex items-center justify-between" style={{ marginBottom: 18 }}>
-              <div>
-                <div className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 5 }}>Live rescue preview</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>Finish hackathon submission</div>
-              </div>
-              <div className="mono" style={{ color: 'var(--warn)', fontSize: 13 }}>99% risk</div>
-            </div>
-
-            <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderBottom: '1px solid rgba(255,255,255,.08)', padding: '16px 0', marginBottom: 16 }}>
-              {[
-                ['Observe', '3 deferrals, 2 bailouts, deadline in hours.'],
-                ['Generate', 'Draft the exact first artifact, with grounded references.'],
-                ['Commit', 'Start a timer and watch for tab departures.'],
-                ['Verify', 'Accept, partial, or reject proof for this task.'],
-              ].map(([label, detail], i) => (
-                <div key={label} className="flex gap-3" style={{ alignItems: 'flex-start', marginTop: i === 0 ? 0 : 13 }}>
-                  <span className="mono" style={{ width: 24, height: 24, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(90,99,230,.14)', color: 'var(--accent)', fontSize: 11, flexShrink: 0 }}>{i + 1}</span>
-                  <div>
-                    <div className="mono" style={{ fontSize: 12, color: 'rgba(243,245,244,.88)', marginBottom: 3 }}>{label}</div>
-                    <div style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--dim)' }}>{detail}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2.5" style={{ color: 'var(--good)', fontSize: 14, fontWeight: 700 }}>
-              <CheckCircle size={18} weight="fill" />
-              <span>No proof, no fake completion.</span>
-            </div>
-          </div>
+          <LivePreview tasks={tasks} topTitle={top?.task.title} risk={top ? Math.min(99, Math.max(15, Math.round(top.score))) : null} stats={stats} followUp={followUp?.message} focusBlock={focusBlock?.commitment.durationMin} groundedCount={grounded?.sources.length ?? 0} />
         </section>
       </div>
     </main>
+  )
+}
+
+function LightTrails() {
+  return (
+    <div aria-hidden="true" style={{ position: 'absolute', inset: '-8% -4% -2% 18%', zIndex: 0, pointerEvents: 'none', opacity: .9 }}>
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            left: `${i * 5}%`,
+            top: `${28 + i * 7}%`,
+            width: '72%',
+            height: 2,
+            borderRadius: 999,
+            background: `linear-gradient(90deg, transparent, rgba(${i % 2 ? '90,99,230' : '88,185,255'},.1), rgba(${i % 2 ? '90,99,230' : '88,185,255'},.72), rgba(224,177,90,.52), transparent)`,
+            transform: `rotate(${i % 2 ? -9 : 7}deg) skewX(-18deg)`,
+            filter: 'blur(.2px)',
+            boxShadow: '0 0 20px rgba(90,99,230,.35)',
+            animation: `trailDrift ${9 + i}s ease-in-out infinite`,
+            animationDelay: `${i * -.9}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groundedCount }: { tasks: ClutchTask[]; topTitle?: string; risk: number | null; stats: ReturnType<typeof overviewStats>; followUp?: string; focusBlock?: number; groundedCount: number }) {
+  const hasData = tasks.length > 0
+  return (
+    <div style={{ position: 'relative', zIndex: 1, perspective: 1200 }}>
+      <div className="glass" style={{ borderRadius: 26, padding: 20, transform: 'rotateY(-8deg) rotateZ(1deg)', transformOrigin: 'center', boxShadow: '0 34px 90px -36px rgba(0,0,0,.85), 0 0 70px -34px rgba(90,99,230,.95)' }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 5 }}>Live overview</div>
+            <div style={{ fontSize: 21, fontWeight: 800 }}>{hasData ? 'Your rescue dashboard' : 'No tasks yet'}</div>
+          </div>
+          <div className="mono" style={{ color: risk ? 'var(--warn)' : 'var(--faint)', fontSize: 13 }}>{risk ? `${risk}% risk` : 'waiting'}</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 8, marginBottom: 13 }}>
+          <PreviewMetric label="follow" value={stats.followThrough} />
+          <PreviewMetric label="proof" value={String(stats.accepted)} />
+          <PreviewMetric label="off-task" value={`${stats.offTaskMinutes}m`} />
+          <PreviewMetric label="rescued" value={String(stats.rescued)} />
+        </div>
+
+        <div style={{ borderRadius: 18, border: '1px solid rgba(90,99,230,.22)', background: 'rgba(90,99,230,.075)', padding: 15, marginBottom: 12 }}>
+          <div className="flex items-center gap-2" style={{ color: 'var(--accent)', marginBottom: 8 }}>
+            <WarningOctagon size={16} weight="fill" />
+            <span className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Most likely to blow up</span>
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.25, marginBottom: 7 }}>{topTitle ?? 'Brain-dump to generate your risk map'}</div>
+          <div style={{ color: 'var(--dim)', fontSize: 13.5, lineHeight: 1.45 }}>{hasData ? 'Ranked from deadlines, deferrals, bailouts, and commitment history.' : 'CLUTCH will rank real tasks once you add them.'}</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <PreviewPanel icon={<Brain size={16} weight="fill" />} label="Gemini plan" title="Function call ready" />
+          <PreviewPanel icon={<LinkSimple size={16} weight="bold" />} label="Grounded refs" title={groundedCount ? `${groundedCount} saved sources` : 'Shown after Search grounding'} />
+          <PreviewPanel icon={<ClockCountdown size={16} weight="fill" />} label="Focus timer" title={focusBlock ? `${focusBlock} min calendar handoff` : 'Add block on commit'} />
+          <PreviewPanel icon={<ShieldCheck size={16} weight="fill" />} label="Proof gate" title={`${stats.accepted}/${stats.partial}/${stats.rejected} verdicts`} />
+        </div>
+
+        <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12 }}>
+          <div className="flex items-center gap-2.5" style={{ color: followUp ? 'var(--warn)' : 'var(--good)', fontSize: 13.5, fontWeight: 700 }}>
+            {followUp ? <CalendarPlus size={17} weight="bold" /> : <CheckCircle size={18} weight="fill" />}
+            <span>{followUp ?? 'No proof, no fake completion.'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PreviewMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ borderRadius: 12, background: 'rgba(0,0,0,.2)', border: '1px solid rgba(255,255,255,.07)', padding: '9px 8px' }}>
+      <div className="mono" style={{ fontSize: 9.5, color: 'var(--faint)', marginBottom: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+      <div style={{ fontSize: 17, fontWeight: 800, color: 'rgba(243,245,244,.92)' }}>{value}</div>
+    </div>
+  )
+}
+
+function PreviewPanel({ icon, label, title }: { icon: React.ReactNode; label: string; title: string }) {
+  return (
+    <div style={{ borderRadius: 14, background: 'rgba(255,255,255,.035)', border: '1px solid rgba(255,255,255,.075)', padding: 11 }}>
+      <div className="flex items-center gap-2" style={{ color: 'var(--accent)', marginBottom: 7 }}>
+        {icon}
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase' }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 12.5, lineHeight: 1.35, color: 'var(--dim)' }}>{title}</div>
+    </div>
   )
 }

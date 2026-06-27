@@ -139,7 +139,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
       if (!res.ok || 'error' in payload) throw new Error('error' in payload ? payload.error : `Request failed (${res.status})`)
       setPlan(payload)
       setMinutes(Math.max(5, Math.min(45, Math.round(payload.suggestedMinutes || 15))))
-      onUpdateTask(task.id, { artifact: payload.artifact, agentTrace: payload.agentTrace ?? [], lastTouched: Date.now() })
+      onUpdateTask(task.id, { artifact: payload.artifact, groundedSources: payload.sources ?? task.groundedSources ?? [], agentTrace: payload.agentTrace ?? [], lastTouched: Date.now() })
       setStep('plan')
     } catch (e) {
       alert(`Clutch couldn't work that out.\n\n${e instanceof Error ? e.message : String(e)}`)

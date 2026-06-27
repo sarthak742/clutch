@@ -123,6 +123,7 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
 @keyframes silk-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pulse-ring { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
 @keyframes caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes trailDrift { 0%, 100% { opacity: 0.42; transform: translateX(-12px) rotate(7deg) skewX(-18deg); } 50% { opacity: 0.95; transform: translateX(18px) rotate(3deg) skewX(-18deg); } }
 
 .caret::after {
   content: '▋'; display: inline; animation: caret-blink 0.85s step-end infinite;
@@ -141,4 +142,13 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
     transition-duration: 0.001ms !important;
   }
   [style*="pulse-ring"], .shimmer { animation: none !important; }
+}
+
+@media (max-width: 860px) {
+  main section[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  div[style*="rotateY(-8deg)"] {
+    transform: none !important;
+  }
 }

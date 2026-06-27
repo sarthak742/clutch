@@ -30,11 +30,19 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const [proofText, setProofText] = useState('')
   const [proofImage, setProofImage] = useState<string | null>(null)
   const [review, setReview] = useState<ProofReview | null>(null)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const [leftNotice, setLeftNotice] = useState(false)
+  const [offTaskSeconds, setOffTaskSeconds] = useState(0)
+  const [leftTabCount, setLeftTabCount] = useState(0)
   const commitmentId = useRef<string | null>(null)
   const pendingStatus = useRef<CommitmentOutcome['status']>('done')
   const countedRef = useRef(false)
   const scopedRef = useRef(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const hiddenStartedAt = useRef<number | null>(null)
+  const secondsLeftRef = useRef(0)
+  const offTaskSecondsRef = useRef(0)
+  const leftTabCountRef = useRef(0)
 
   const ctx = {
     title: task.title,
@@ -72,6 +80,55 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     return () => clearTimeout(t)
   }, [step, running, secondsLeft])
 
+  useEffect(() => {
+    secondsLeftRef.current = secondsLeft
+  }, [secondsLeft])
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const sync = () => setPrefersReducedMotion(media.matches)
+    sync()
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
+    if (step !== 'work') return
+    const originalTitle = document.title
+
+    const recordReturn = () => {
+      const started = hiddenStartedAt.current
+      if (!started) return
+      const added = Math.max(1, Math.round((Date.now() - started) / 1000))
+      hiddenStartedAt.current = null
+      offTaskSecondsRef.current += added
+      setOffTaskSeconds(offTaskSecondsRef.current)
+      setLeftNotice(true)
+      document.title = originalTitle
+    }
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (!hiddenStartedAt.current) {
+          hiddenStartedAt.current = Date.now()
+          leftTabCountRef.current += 1
+          setLeftTabCount(leftTabCountRef.current)
+          setLeftNotice(false)
+        }
+        document.title = `${Math.max(1, Math.ceil(secondsLeftRef.current / 60))} min left - come back | CLUTCH`
+        return
+      }
+      recordReturn()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      document.title = originalTitle
+      recordReturn()
+    }
+  }, [step])
+
   const act = async () => {
     setStep('acting')
     const qa: QAPair[] = (questions ?? []).map((q, i) => ({ question: q, answer: answers[i] ?? '' }))
@@ -91,8 +148,14 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
 
   const commit = () => {
     if (!plan) return
-    const c: Commitment = { id: crypto.randomUUID(), action: plan.suggestedAction, durationMin: minutes, committedAt: Date.now() }
+    const c: Commitment = { id: crypto.randomUUID(), action: plan.suggestedAction, durationMin: minutes, committedAt: Date.now(), offTaskSeconds: 0, leftTabCount: 0 }
     commitmentId.current = c.id
+    hiddenStartedAt.current = null
+    offTaskSecondsRef.current = 0
+    leftTabCountRef.current = 0
+    setOffTaskSeconds(0)
+    setLeftTabCount(0)
+    setLeftNotice(false)
     onUpdateTask(task.id, { commitments: [...task.commitments, c] })
     onFollowThrough({ ...followThrough, committed: followThrough.committed + 1 })
     setSecondsLeft(minutes * 60)
@@ -133,11 +196,14 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     } catch { /* neutral logging */ }
     setReview(result)
 
-    const outcome: CommitmentOutcome = { status, proof: proofText.trim() || undefined, proofImage: proofImage ?? undefined, reviewSolid: result?.solid, reviewReaction: result?.reaction, at: Date.now() }
+    const hiddenDelta = hiddenStartedAt.current ? Math.max(1, Math.round((Date.now() - hiddenStartedAt.current) / 1000)) : 0
+    const finalOffTaskSeconds = offTaskSecondsRef.current + hiddenDelta
+    hiddenStartedAt.current = null
+    const outcome: CommitmentOutcome = { status, proof: proofText.trim() || undefined, proofImage: proofImage ?? undefined, offTaskSeconds: finalOffTaskSeconds, leftTabCount: leftTabCountRef.current, reviewSolid: result?.solid, reviewReaction: result?.reaction, at: Date.now() }
     const solid = result ? result.solid : true
     const counted = status === 'done' && solid && !countedRef.current
     onUpdateTask(task.id, {
-      commitments: task.commitments.map((c) => (c.id === commitmentId.current ? { ...c, outcome } : c)),
+      commitments: task.commitments.map((c) => (c.id === commitmentId.current ? { ...c, offTaskSeconds: finalOffTaskSeconds, leftTabCount: leftTabCountRef.current, outcome } : c)),
       status: status === 'done' && solid ? 'done' : 'in_progress',
       progressNotes: [...task.progressNotes, proofText.trim() || `(${status})`],
       lastTouched: Date.now(),
@@ -309,14 +375,23 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
 
         {/* WORK */}
         {step === 'work' && plan && (
-          <div className="flex flex-col items-center justify-center text-center" style={{ animation: 'stepIn .62s cubic-bezier(.2,.65,.25,1) both', flex: 1, padding: '20px 0', gap: 8 }}>
+          <div className="flex flex-col items-center justify-center text-center" style={{ animation: prefersReducedMotion ? 'none' : 'stepIn .62s cubic-bezier(.2,.65,.25,1) both', flex: 1, padding: '20px 0', gap: 8 }}>
             <div className="flex items-center gap-2.5" style={{ marginBottom: 14 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 14px 3px rgba(90,99,230,.7)', animation: 'breathe 2.4s ease-in-out infinite' }} />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 14px 3px rgba(90,99,230,.7)', animation: prefersReducedMotion ? 'none' : 'breathe 2.4s ease-in-out infinite' }} />
               <span style={{ fontSize: 14, color: 'var(--dim)' }}>I&apos;m watching the clock.</span>
             </div>
 
+            {leftTabCount > 0 && (
+              <div style={{ width: '100%', maxWidth: 360, borderRadius: 16, padding: '12px 14px', background: leftNotice ? 'rgba(224,177,90,.14)' : 'rgba(255,255,255,.06)', border: `1px solid ${leftNotice ? 'rgba(224,177,90,.34)' : 'rgba(255,255,255,.1)'}`, color: leftNotice ? 'var(--warn)' : 'var(--faint)', fontSize: 13.5, lineHeight: 1.4, marginBottom: 10 }}>
+                {leftNotice
+                  ? `You left - ${Math.max(1, Math.ceil(secondsLeft / 60))} min left. Come back.`
+                  : `${leftTabCount} tab switch${leftTabCount === 1 ? '' : 'es'} recorded.`}
+                {offTaskSeconds > 0 && <span className="mono" style={{ marginLeft: 8, color: 'var(--faint)' }}>{Math.ceil(offTaskSeconds / 60)}m off-task</span>}
+              </div>
+            )}
+
             <div style={{ position: 'relative', width: 268, height: 268, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `conic-gradient(#5A63E6 ${timerDeg}, rgba(255,255,255,.07) 0)`, transition: 'background .9s linear' }} />
+              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `conic-gradient(#5A63E6 ${timerDeg}, rgba(255,255,255,.07) 0)`, transition: prefersReducedMotion ? 'none' : 'background .9s linear' }} />
               <div style={{ position: 'absolute', inset: 14, borderRadius: '50%', background: 'radial-gradient(circle at 50% 35%, #1a1830, #0c0b1a)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.8)' }} />
               <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <div className="mono" style={{ fontSize: 54, fontWeight: 500, letterSpacing: '-.02em', lineHeight: 1 }}>{mmss}</div>

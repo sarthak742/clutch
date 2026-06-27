@@ -44,6 +44,8 @@ export interface CommitmentOutcome {
   proof?: string
   /** Base64 screenshot shown as proof. */
   proofImage?: string
+  offTaskSeconds?: number
+  leftTabCount?: number
   reviewSolid?: boolean
   reviewReaction?: string
   at: number
@@ -54,6 +56,8 @@ export interface Commitment {
   action: string
   durationMin: number
   committedAt: number
+  offTaskSeconds?: number
+  leftTabCount?: number
   outcome?: CommitmentOutcome
 }
 

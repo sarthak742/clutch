@@ -41,11 +41,11 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
           <LightTrails />
           <div style={{ position: 'relative', zIndex: 1 }}>
             <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>AI accountability companion</span>
-            <h1 className="clutch-hero-title" style={{ fontSize: 'clamp(88px,10.8vw,184px)', marginBottom: 30 }}>
-              CLUTCH
+            <h1 className="clutch-hero-title" style={{ fontSize: 'clamp(92px,11vw,190px)', marginBottom: 30 }}>
+              <span className="hero-title-white">CLU</span><span className="hero-title-blue">TCH</span>
             </h1>
             <p style={{ fontSize: 'clamp(28px,2.8vw,46px)', lineHeight: 1.12, color: 'rgba(243,245,244,.94)', maxWidth: '18ch', marginBottom: 22, fontWeight: 800 }}>
-              The app that steps in before your <span className="hero-blue-phrase">deadline slips.</span>
+              The app that steps in before your <span style={{ color: '#5268d8', textShadow: '0 0 26px rgba(82,104,216,.32)' }}>deadline slips.</span>
             </p>
             <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--dim)', maxWidth: '43ch', marginBottom: 34 }}>
               Dump the mess. Clutch finds the riskiest commitment, asks what matters, starts the smallest useful move, and verifies proof before it gives you credit.

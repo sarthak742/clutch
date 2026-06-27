@@ -72,23 +72,24 @@ body {
 .serif { font-family: var(--font-display); }
 
 .clutch-hero-title {
-  font-family: Algerian, "Cinzel Decorative", "Cormorant Garamond", Georgia, serif;
+  font-family: Algerian, "Copperplate Gothic Bold", "Bodoni 72 Smallcaps", "Bodoni MT Black", "Times New Roman", Georgia, serif;
   font-weight: 400;
   line-height: 0.82;
-  letter-spacing: 0;
-  color: transparent;
-  background:
-    linear-gradient(105deg, #f8fbff 0%, #f8fbff 48%, #bfd0ff 58%, #5f75e8 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
+  letter-spacing: 0.015em;
   text-shadow:
     0 0 24px rgba(189, 210, 255, 0.2),
     0 0 82px rgba(90, 99, 230, 0.22);
 }
 
-.hero-blue-phrase {
-  color: #6f85ea;
-  text-shadow: 0 0 24px rgba(90, 99, 230, 0.22);
+.hero-title-white {
+  color: #f8fbff;
+}
+
+.hero-title-blue {
+  color: #6479ee;
+  text-shadow:
+    0 0 24px rgba(100, 121, 238, 0.42),
+    0 0 88px rgba(90, 99, 230, 0.3);
 }
 
 /* ── Glass + control utilities ── */

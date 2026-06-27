@@ -102,8 +102,8 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
                 {!hasExisting && onLoadDemo && (
                   <button onClick={onLoadDemo} className="mono" style={{ fontSize: 12, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}>load demo scenario</button>
                 )}
-                {hasExisting && onCancel && (
-                  <button onClick={onCancel} className="mono" style={{ fontSize: 12, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}>cancel</button>
+                {onCancel && (
+                  <button onClick={onCancel} className="mono" style={{ fontSize: 12, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}>{hasExisting ? 'cancel' : 'back'}</button>
                 )}
               </div>
             </div>

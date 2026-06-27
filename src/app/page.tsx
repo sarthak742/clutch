@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { Landing } from '@/components/clutch/Landing'
 import { Capture } from '@/components/clutch/Capture'
 import { Briefing } from '@/components/clutch/Briefing'
 import { Engage } from '@/components/clutch/Engage'
@@ -11,10 +12,10 @@ import { fromParsed } from '@/lib/task'
 import { createDemoState } from '@/lib/demo'
 import type { ClutchTask, ParsedTask, FollowThrough } from '@/lib/types'
 
-type View = 'capture' | 'briefing' | 'engage'
+type View = 'landing' | 'capture' | 'briefing' | 'engage'
 
 export default function Home() {
-  const [view, setView] = useState<View>('briefing')
+  const [view, setView] = useState<View>('landing')
   const [tasks, setTasks] = useState<ClutchTask[]>([])
   const [followThrough, setFollowThrough] = useState<FollowThrough>({ committed: 0, completed: 0 })
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -24,7 +25,7 @@ export default function Home() {
     const state = loadClutchState()
     setTasks(state.tasks)
     setFollowThrough(state.followThrough)
-    setView(state.tasks.length === 0 ? 'capture' : 'briefing')
+    setView(state.tasks.length === 0 ? 'landing' : 'briefing')
     setReady(true)
   }, [])
 
@@ -79,13 +80,19 @@ export default function Home() {
       <AppBackground />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <AnimatePresence mode="wait">
+          {view === 'landing' && (
+            <motion.div key="landing" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
+              <Landing onStart={() => setView('capture')} onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined} />
+            </motion.div>
+          )}
+
           {view === 'capture' && (
             <motion.div key="capture" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               <Capture
                 hasExisting={tasks.length > 0}
                 onParsed={handleParsed}
                 onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined}
-                onCancel={tasks.length > 0 ? () => setView('briefing') : undefined}
+                onCancel={tasks.length > 0 ? () => setView('briefing') : () => setView('landing')}
               />
             </motion.div>
           )}

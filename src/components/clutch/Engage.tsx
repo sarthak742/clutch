@@ -269,6 +269,26 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
               </div>
             </div>
 
+            {plan.sources && plan.sources.length > 0 && (
+              <div className="glass" style={{ borderRadius: 18, padding: 16, marginBottom: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>Grounded references</div>
+                <div className="flex flex-col" style={{ gap: 9 }}>
+                  {plan.sources.map((source, i) => (
+                    <a
+                      key={`${source.uri}-${i}`}
+                      href={source.uri}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: 'rgba(243,245,244,.86)', textDecoration: 'none', fontSize: 13.5, lineHeight: 1.4 }}
+                    >
+                      <span className="mono" style={{ color: 'var(--accent)', flexShrink: 0 }}>[{i + 1}]</span>
+                      <span style={{ overflowWrap: 'anywhere' }}>{source.title}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={{ borderRadius: 20, background: 'rgba(90,99,230,.09)', border: '1px solid rgba(90,99,230,.28)', padding: 20, marginBottom: 18 }}>
               <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(90,99,230,.85)', marginBottom: 10 }}>Commit to one thing</div>
               <div className="flex items-start justify-between gap-3.5">

@@ -109,8 +109,14 @@ export interface ActionPlan {
   suggestedMinutes: number
   artifact: string
   agentTrace?: { label: string; detail: string }[]
+  sources?: GroundedSource[]
   /** Visible pipeline steps, not Gemini SDK function-calling. */
   toolCalls?: string[]
+}
+
+export interface GroundedSource {
+  title: string
+  uri: string
 }
 
 export interface QAPair {
@@ -231,11 +237,76 @@ Use their specifics. Do NOT give generic advice — tailor everything to what th
   }))
   const fallback = fallbackAction(task, qa)
   const parsed = parseJSON(response.text, fallback) as ActionPlan
+  const sources = await groundedSourcesForTask(task, qa)
+  const sourceTrace = sources.length
+    ? [{ label: 'groundWithGoogleSearch', detail: `Fetched ${sources.length} grounded reference source(s) for this task.` }]
+    : []
   return {
     ...parsed,
-    agentTrace: parsed.agentTrace?.length ? parsed.agentTrace : fallback.agentTrace,
+    agentTrace: [...(parsed.agentTrace?.length ? parsed.agentTrace : fallback.agentTrace ?? []), ...sourceTrace],
     toolCalls: parsed.toolCalls?.length ? parsed.toolCalls : fallback.toolCalls,
+    sources: sources.length ? sources : undefined,
   }
+}
+
+async function groundedSourcesForTask(task: TaskCtx, qa: QAPair[]): Promise<GroundedSource[]> {
+  if (!shouldUseGrounding(task, qa)) return []
+
+  const context = qa.filter((p) => p.answer.trim()).map((p) => `${p.question}: ${p.answer}`).join('\n')
+  try {
+    const response = await withGeminiResilience('google search grounding', () => getClient().models.generateContent({
+      model: MODEL,
+      contents: `Use Google Search grounding to find current, credible sources that would help the user with this task.
+
+Task: "${task.title}"
+User context:
+${context || '(none)'}
+
+      Return a concise reference note naming only the most relevant sources. Prefer official docs, university/government pages, or reputable explainers. Do not invent URLs.`,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    }))
+    return extractGroundedSources(response)
+  } catch (error) {
+    console.warn('[gemini] Google Search grounding unavailable:', error)
+    return []
+  }
+}
+
+function shouldUseGrounding(task: TaskCtx, qa: QAPair[]): boolean {
+  const haystack = [
+    task.title,
+    task.category,
+    task.artifact ?? '',
+    ...qa.flatMap((p) => [p.question, p.answer]),
+  ].join(' ').toLowerCase()
+  return /\b(essay|paper|research|study|exam|learn|explain|how to|tutorial|sources?|references?|cite|citation|docs?|documentation|deploy|cloud run|gemini|api|case study|report|presentation)\b/.test(haystack)
+}
+
+function extractGroundedSources(response: unknown): GroundedSource[] {
+  const candidate = (response as { candidates?: Array<{ groundingMetadata?: { groundingChunks?: Array<{ web?: { title?: string; uri?: string } }> } }> }).candidates?.[0]
+  const chunks = candidate?.groundingMetadata?.groundingChunks ?? []
+  const seen = new Set<string>()
+  return chunks
+    .map((chunk) => chunk.web)
+    .filter((web): web is { title?: string; uri?: string } => Boolean(web?.uri))
+    .map((web) => {
+      const uri = web.uri ?? ''
+      let fallbackTitle = uri
+      try {
+        fallbackTitle = new URL(uri).hostname.replace(/^www\./, '')
+      } catch {
+        fallbackTitle = 'Grounded source'
+      }
+      return { title: (web.title ?? '').trim() || fallbackTitle, uri }
+    })
+    .filter((source) => {
+      if (seen.has(source.uri)) return false
+      seen.add(source.uri)
+      return true
+    })
+    .slice(0, 5)
 }
 
 /**

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { ArrowLeft, ArrowRight, MagicWand, Timer, Play, Pause, Paperclip, Image as ImageIcon, CheckCircle, Eye, Warning, CalendarPlus } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough, Commitment, CommitmentOutcome } from '@/lib/types'
 import type { ActionPlan, InterventionDecision, QAPair, ProofReview } from '@/lib/gemini'
+import { timeMemory } from '@/lib/timeMemory'
 
 interface Props {
   task: ClutchTask
@@ -49,7 +50,7 @@ function resumeActionPlan(task: ClutchTask, decision: InterventionDecision): Act
       : `Resume the prior commitment: ${priorAction}\n\nBring back concrete proof for this exact action.`,
     agentTrace: [
       { label: `chooseIntervention:${decision.strategy}`, detail: decision.reasoning },
-      { label: 'inspectBehaviorMemory', detail: `Found ${task.commitments.length} prior commitment(s), ${task.deferralCount} deferral(s), and ${task.openedThenBailed} bailout(s).` },
+      { label: 'inspectBehaviorMemory', detail: `Found ${task.commitments.length} prior commitment(s), ${task.deferralCount} deferral(s), and ${task.openedThenBailed} bailout(s). ${timeMemory(task).accountabilityLine}` },
       { label: 'resumePriorAttempt', detail: reaction ? `Using the last proof reaction: ${reaction}` : 'Using the latest commitment as the next action.' },
     ],
     toolCalls: ['chooseIntervention', 'inspectBehaviorMemory', 'resumePriorAttempt', 'setCommitment'],
@@ -91,6 +92,8 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     deadline: task.deadline,
     effort: task.effort,
     category: task.category,
+    createdAt: task.createdAt,
+    lastTouched: task.lastTouched,
     deferralCount: task.deferralCount,
     openedThenBailed: task.openedThenBailed,
     progressNotes: task.progressNotes,

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowRight, ArrowUUpLeft, BellRinging, CalendarPlus, CalendarX, ChartLineUp, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
+import { ArrowRight, ArrowUUpLeft, BellRinging, CalendarPlus, CalendarX, ChartLineUp, ClockCounterClockwise, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
 import { deadlineLabel, EFFORT_LABEL } from '@/lib/task'
 import type { DayPlan, MorningBriefing } from '@/lib/gemini'
 import { followUpMemory, latestFocusBlock, latestGroundedSources, overviewStats } from '@/lib/overview'
+import { timeMemory } from '@/lib/timeMemory'
 
 interface Props {
   tasks: ClutchTask[]
@@ -281,6 +282,7 @@ function DashboardScreen({ analytics, followUp, focusBlock, grounded, top, rest,
 }
 
 function TopRiskCard({ top, onEngage, onDefer }: { top: ReturnType<typeof rankTasks>[number]; onEngage: (id: string) => void; onDefer: (id: string) => void }) {
+  const memory = timeMemory(top.task)
   return (
     <div style={{ animation: 'heroReveal 1.05s cubic-bezier(.18,.7,.24,1) both', position: 'relative', borderRadius: 24, overflow: 'hidden', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(224,177,90,.34)', backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', boxShadow: '0 30px 70px -32px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06)', padding: 22 }}>
       <div style={{ position: 'absolute', top: '-40%', right: '-20%', width: '60%', height: '120%', background: 'radial-gradient(circle, rgba(90,99,230,.22) 0%, transparent 70%)', pointerEvents: 'none', animation: 'haloPulse 6s ease-in-out infinite' }} />
@@ -297,8 +299,12 @@ function TopRiskCard({ top, onEngage, onDefer }: { top: ReturnType<typeof rankTa
         </p>
         <div className="flex flex-wrap gap-2" style={{ marginBottom: 20 }}>
           <Chip icon={<CalendarX size={14} />} label={top.reason} />
+          <Chip icon={<ClockCounterClockwise size={14} />} label={memory.added} />
           <Chip icon={<HourglassMedium size={14} />} label={EFFORT_LABEL[top.task.effort]} />
           {top.task.deferralCount > 0 && <Chip icon={<ArrowUUpLeft size={14} />} label={`Dodged ${top.task.deferralCount}x`} />}
+        </div>
+        <div style={{ marginBottom: 18, padding: '11px 13px', borderRadius: 14, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.07)', color: 'var(--dim)', fontSize: 13.5, lineHeight: 1.45 }}>
+          {memory.accountabilityLine}
         </div>
         <div className="flex items-center gap-2.5" style={{ marginBottom: 22 }}>
           <div style={{ flex: 1, height: 5, borderRadius: 999, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
@@ -419,6 +425,7 @@ function ProofScreen({ tasks, analytics }: { tasks: ClutchTask[]; analytics: Ret
 }
 
 function MemoryScreen({ tasks, followUp, onEngage }: { tasks: ClutchTask[]; followUp: ReturnType<typeof followUpMemory>; onEngage: (id: string) => void }) {
+  const now = Date.now()
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       {followUp ? (
@@ -430,16 +437,21 @@ function MemoryScreen({ tasks, followUp, onEngage }: { tasks: ClutchTask[]; foll
         <EmptyPanel title="No stale commitment yet" detail="When you commit and leave something unfinished, CLUTCH will surface it here." />
       )}
       <div style={{ display: 'grid', gap: 10 }}>
-        {tasks.map((task) => (
-          <div key={task.id} className="glass" style={{ borderRadius: 16, padding: 15 }}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>{task.title}</div>
-            <div className="flex flex-wrap gap-2">
-              <Chip icon={<ArrowUUpLeft size={14} />} label={`${task.deferralCount} deferrals`} />
-              <Chip icon={<WarningOctagon size={14} />} label={`${task.openedThenBailed} bailouts`} />
-              <Chip icon={<ShieldCheck size={14} />} label={`${task.commitments.length} commitments`} />
+        {tasks.map((task) => {
+          const memory = timeMemory(task, now)
+          return (
+            <div key={task.id} className="glass" style={{ borderRadius: 16, padding: 15 }}>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>{task.title}</div>
+              <div style={{ color: 'var(--dim)', fontSize: 13.5, lineHeight: 1.45, marginBottom: 10 }}>{memory.accountabilityLine}</div>
+              <div className="flex flex-wrap gap-2">
+                <Chip icon={<ClockCounterClockwise size={14} />} label={memory.lastTouched} />
+                <Chip icon={<ArrowUUpLeft size={14} />} label={`${task.deferralCount} deferrals`} />
+                <Chip icon={<WarningOctagon size={14} />} label={`${task.openedThenBailed} bailouts`} />
+                <Chip icon={<ShieldCheck size={14} />} label={`${task.commitments.length} commitments`} />
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -485,6 +497,7 @@ function TaskTeaser({ tasks, now, onScreen }: { tasks: ReturnType<typeof rankTas
 
 function TaskRow({ ranked, now, onEngage }: { ranked: ReturnType<typeof rankTasks>[number]; now: number; onEngage: (id: string) => void }) {
   const dc = dotColor(ranked.score)
+  const memory = timeMemory(ranked.task, now)
   return (
     <button
       onClick={() => onEngage(ranked.task.id)}
@@ -495,7 +508,7 @@ function TaskRow({ ranked, now, onEngage }: { ranked: ReturnType<typeof rankTask
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ranked.task.title}</div>
         <div style={{ fontSize: 13, color: 'var(--faint)', marginTop: 3 }}>
-          {deadlineLabel(ranked.task.deadline, now)} / {EFFORT_LABEL[ranked.task.effort]}{ranked.task.deferralCount > 0 ? ` / dodged ${ranked.task.deferralCount}x` : ''}
+          {deadlineLabel(ranked.task.deadline, now)} / {memory.lastTouched} / {EFFORT_LABEL[ranked.task.effort]}{ranked.task.deferralCount > 0 ? ` / dodged ${ranked.task.deferralCount}x` : ''}
         </div>
       </div>
       <div className="flex items-center gap-1.5" style={{ flexShrink: 0, color: 'rgba(90,99,230,.9)', fontSize: 13, fontWeight: 700 }}>

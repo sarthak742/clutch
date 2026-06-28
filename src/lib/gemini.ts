@@ -2,6 +2,7 @@
 import type { ReflectionData, Step, ParsedTask, ClutchTask } from './types'
 import { formatDeadlineISO } from './date'
 import { rankTasks } from './triage'
+import { timeMemorySignals } from './timeMemory'
 
 const MODEL = 'gemini-2.5-flash'
 const GEMINI_TIMEOUT_MS = 22_000
@@ -221,7 +222,7 @@ export interface InterventionDecision {
 }
 
 type TaskCtx = Pick<ClutchTask, 'title' | 'deadline' | 'effort' | 'category' | 'deferralCount'> &
-  Partial<Pick<ClutchTask, 'openedThenBailed' | 'progressNotes' | 'commitments' | 'artifact'>>
+  Partial<Pick<ClutchTask, 'createdAt' | 'lastTouched' | 'openedThenBailed' | 'progressNotes' | 'commitments' | 'artifact'>>
 
 function taskSignals(task: TaskCtx): string {
   const notes = (task.progressNotes ?? []).slice(-3)
@@ -234,6 +235,7 @@ function taskSignals(task: TaskCtx): string {
     `effort ~${task.effort}`,
     `category ${task.category}`,
     `deadline ${formatDeadlineISO(task.deadline)}`,
+    `time memory: ${timeMemorySignals(task).join(' | ')}`,
     notes.length ? `recent progress: ${notes.join(' | ')}` : 'recent progress: none',
     outcomes.length ? `recent commitments: ${outcomes.join(' | ')}` : 'recent commitments: none',
   ].join(', ')
@@ -1000,7 +1002,7 @@ export async function morningBriefing(
       contents: `You are Clutch writing a proactive ${timeOfDay} briefing â€” the kind that would arrive as a push notification or email digest before the user even opens the app. Be honest, specific, and concise. No filler.
 
 Top risk-ranked tasks:
-${ranked.map((r) => `- "${r.task.title}" (risk ${r.score}, reason: ${r.reason}, deferred ${r.task.deferralCount}x, bailed ${r.task.openedThenBailed}x)`).join('\n')}
+${ranked.map((r) => `- "${r.task.title}" (risk ${r.score}, reason: ${r.reason}, ${timeMemorySignals(r.task).join('; ')})`).join('\n')}
 
 Unfinished proof:
 ${staleCommitments.length > 0 ? staleCommitments.map((s) => `- "${s.task}": committed to "${s.action}", verdict was ${s.verdict}`).join('\n') : '(none)'}
@@ -1039,7 +1041,7 @@ Return:
 
 Time of day: ${timeOfDay}
 Top risk-ranked tasks:
-${ranked.map((r) => `- "${r.task.title}" (risk ${r.score}, reason: ${r.reason}, deferred ${r.task.deferralCount}x, bailed ${r.task.openedThenBailed}x)`).join('\n')}
+${ranked.map((r) => `- "${r.task.title}" (risk ${r.score}, reason: ${r.reason}, ${timeMemorySignals(r.task).join('; ')})`).join('\n')}
 
 Unfinished proof:
 ${staleCommitments.length > 0 ? staleCommitments.map((s) => `- "${s.task}": committed to "${s.action}", verdict was ${s.verdict}`).join('\n') : '(none)'}

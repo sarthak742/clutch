@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { ArrowLeft, ArrowRight, MagicWand, Timer, Play, Pause, Paperclip, Image as ImageIcon, CheckCircle, Eye, Warning, CalendarPlus } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough, Commitment, CommitmentOutcome } from '@/lib/types'
-import type { ActionPlan, QAPair, ProofReview } from '@/lib/gemini'
+import type { ActionPlan, InterventionDecision, QAPair, ProofReview } from '@/lib/gemini'
 
 interface Props {
   task: ClutchTask
@@ -18,6 +18,44 @@ const FALLBACK_Q = ['What specifically does this involve?', 'How much time do yo
 const MAIN: Step[] = ['scope', 'plan', 'work', 'proof']
 const stepIndex = (s: Step) => (s === 'acting' ? 0 : s === 'reviewing' || s === 'done' ? 3 : MAIN.indexOf(s))
 
+function withRouterTrace(plan: ActionPlan, decision: InterventionDecision | null): ActionPlan {
+  if (!decision) return plan
+  return {
+    ...plan,
+    suggestedMinutes: decision.strategy === 'quick_start' ? 5 : plan.suggestedMinutes,
+    agentTrace: [
+      {
+        label: `chooseIntervention:${decision.strategy}`,
+        detail: decision.reasoning,
+      },
+      ...(plan.agentTrace ?? []),
+    ],
+    toolCalls: ['chooseIntervention', ...(plan.toolCalls ?? [])],
+  }
+}
+
+function resumeActionPlan(task: ClutchTask, decision: InterventionDecision): ActionPlan {
+  const latestCommitment = [...task.commitments].reverse().find((commitment) => commitment.outcome) ?? [...task.commitments].reverse()[0]
+  const reaction = latestCommitment?.outcome?.reviewReaction
+  const priorAction = latestCommitment?.action ?? `Make visible progress on "${task.title}"`
+  return {
+    diagnosis: reaction
+      ? `You already tried this once, and the last proof was not fully accepted: ${reaction}`
+      : `You already have context for this task, so restarting with scope questions would add friction.`,
+    suggestedAction: priorAction,
+    suggestedMinutes: Math.max(5, Math.min(25, latestCommitment?.durationMin ?? 10)),
+    artifact: task.artifact
+      ? `Resume from the existing artifact:\n${task.artifact}\n\nNext proof must show the missing task-matched evidence.`
+      : `Resume the prior commitment: ${priorAction}\n\nBring back concrete proof for this exact action.`,
+    agentTrace: [
+      { label: `chooseIntervention:${decision.strategy}`, detail: decision.reasoning },
+      { label: 'inspectBehaviorMemory', detail: `Found ${task.commitments.length} prior commitment(s), ${task.deferralCount} deferral(s), and ${task.openedThenBailed} bailout(s).` },
+      { label: 'resumePriorAttempt', detail: reaction ? `Using the last proof reaction: ${reaction}` : 'Using the latest commitment as the next action.' },
+    ],
+    toolCalls: ['chooseIntervention', 'inspectBehaviorMemory', 'resumePriorAttempt', 'setCommitment'],
+  }
+}
+
 export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onBack }: Props) {
   const [step, setStep] = useState<Step>('scope')
   const [questions, setQuestions] = useState<string[] | null>(null)
@@ -30,6 +68,8 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const [proofText, setProofText] = useState('')
   const [proofImage, setProofImage] = useState<string | null>(null)
   const [review, setReview] = useState<ProofReview | null>(null)
+  const [intervention, setIntervention] = useState<InterventionDecision | null>(null)
+  const [reEvaluation, setReEvaluation] = useState<InterventionDecision | null>(null)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const [leftNotice, setLeftNotice] = useState(false)
   const [offTaskSeconds, setOffTaskSeconds] = useState(0)
@@ -62,6 +102,27 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     scopedRef.current = true
     ;(async () => {
       try {
+        const interventionRes = await fetch('/api/intervene', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: ctx }) })
+        const interventionPayload = (await interventionRes.json()) as InterventionDecision | { error: string }
+        const decision: InterventionDecision = !interventionRes.ok || 'error' in interventionPayload
+          ? { strategy: 'scope_first', reasoning: 'Intervention routing was unavailable, so Clutch fell back to the standard scope-first flow.' }
+          : interventionPayload
+        setIntervention(decision)
+
+        if (decision.strategy === 'resume') {
+          const resumePlan = resumeActionPlan(task, decision)
+          setPlan(resumePlan)
+          setMinutes(Math.max(5, Math.min(45, Math.round(resumePlan.suggestedMinutes || 10))))
+          onUpdateTask(task.id, { agentTrace: resumePlan.agentTrace ?? [], lastTouched: Date.now() })
+          setStep('plan')
+          return
+        }
+
+        if (decision.strategy === 'quick_start') {
+          await requestAction([], `${decision.reasoning} Generate a tiny 5-minute first action with no extra scoping questions.`, decision)
+          return
+        }
+
         const res = await fetch('/api/scope', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: ctx }) })
         const payload = (await res.json()) as { questions: string[] } | { error: string }
         const qs = !res.ok || 'error' in payload || !payload.questions?.length ? FALLBACK_Q : payload.questions
@@ -130,21 +191,26 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     }
   }, [step])
 
-  const act = async () => {
+  const requestAction = async (qa: QAPair[], note?: string, decision = intervention) => {
     setStep('acting')
-    const qa: QAPair[] = (questions ?? []).map((q, i) => ({ question: q, answer: answers[i] ?? '' }))
     try {
-      const res = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: ctx, qa }) })
+      const res = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: ctx, qa, note }) })
       const payload = (await res.json()) as ActionPlan | { error: string }
       if (!res.ok || 'error' in payload) throw new Error('error' in payload ? payload.error : `Request failed (${res.status})`)
-      setPlan(payload)
-      setMinutes(Math.max(5, Math.min(45, Math.round(payload.suggestedMinutes || 15))))
-      onUpdateTask(task.id, { artifact: payload.artifact, groundedSources: payload.sources ?? task.groundedSources ?? [], agentTrace: payload.agentTrace ?? [], lastTouched: Date.now() })
+      const planWithRouter = withRouterTrace(payload, decision)
+      setPlan(planWithRouter)
+      setMinutes(decision?.strategy === 'quick_start' ? 5 : Math.max(5, Math.min(45, Math.round(planWithRouter.suggestedMinutes || 15))))
+      onUpdateTask(task.id, { artifact: planWithRouter.artifact, groundedSources: planWithRouter.sources ?? task.groundedSources ?? [], agentTrace: planWithRouter.agentTrace ?? [], lastTouched: Date.now() })
       setStep('plan')
     } catch (e) {
       alert(`Clutch couldn't work that out.\n\n${e instanceof Error ? e.message : String(e)}`)
       setStep('scope')
     }
+  }
+
+  const act = async () => {
+    const qa: QAPair[] = (questions ?? []).map((q, i) => ({ question: q, answer: answers[i] ?? '' }))
+    await requestAction(qa)
   }
 
   const commit = () => {
@@ -223,9 +289,41 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     })
     if (counted) { countedRef.current = true; onFollowThrough({ ...followThrough, completed: followThrough.completed + 1 }) }
     setStep('done')
+
+    // Re-evaluation checkpoint: after partial/rejected proof, call the intervention router again
+    if (verdict !== 'accepted') {
+      try {
+        const reCtx = { ...ctx, progressNotes: [...task.progressNotes, proofText.trim() || `(${status})`], commitments: task.commitments.map((c) => (c.id === commitmentId.current ? { ...c, outcome } : c)) }
+        const reRes = await fetch('/api/intervene', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: reCtx }) })
+        const rePayload = (await reRes.json()) as InterventionDecision | { error: string }
+        if (reRes.ok && !('error' in rePayload)) setReEvaluation(rePayload)
+      } catch { /* silent — re-evaluation is additive */ }
+    }
   }
 
-  const backToWork = () => { setSecondsLeft(10 * 60); setTotalSeconds(10 * 60); setRunning(true); setStep('work') }
+  const backToWork = (durationMin = 10) => { setReEvaluation(null); setSecondsLeft(durationMin * 60); setTotalSeconds(durationMin * 60); setRunning(true); setStep('work') }
+  const retryFromReEval = () => {
+    if (!reEvaluation) return backToWork()
+    if (reEvaluation.strategy === 'quick_start') return backToWork(5)
+    if (reEvaluation.strategy === 'resume') return backToWork(10)
+    // scope_first: reset to scope step
+    setReEvaluation(null)
+    scopedRef.current = false
+    setStep('scope')
+    // Re-trigger scope flow
+    ;(async () => {
+      try {
+        const res = await fetch('/api/scope', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: ctx }) })
+        const payload = (await res.json()) as { questions: string[] } | { error: string }
+        const qs = !res.ok || 'error' in payload || !payload.questions?.length ? FALLBACK_Q : payload.questions
+        setQuestions(qs)
+        setAnswers(new Array(qs.length).fill(''))
+      } catch {
+        setQuestions(FALLBACK_Q)
+        setAnswers(new Array(FALLBACK_Q.length).fill(''))
+      }
+    })()
+  }
   const leaveEngage = () => {
     if (!commitmentId.current && step !== 'done') {
       onUpdateTask(task.id, { openedThenBailed: task.openedThenBailed + 1, lastTouched: Date.now() })
@@ -495,11 +593,23 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
               {review?.nextNudge && <p style={{ fontSize: 15.5, lineHeight: 1.6, color: 'var(--dim)' }}>Next: {review.nextNudge}</p>}
             </div>
 
+            {reEvaluation && !solid && (
+              <div style={{ marginTop: 14, borderRadius: 16, padding: '14px 16px', background: 'rgba(90,99,230,.07)', border: '1px solid rgba(90,99,230,.22)' }}>
+                <div className="mono" style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 8 }}>Agent re-evaluated after proof review</div>
+                <div style={{ fontSize: 14, lineHeight: 1.5, color: 'rgba(243,245,244,.86)', marginBottom: 4 }}>
+                  Strategy: <strong>{reEvaluation.strategy === 'quick_start' ? 'Quick 5-min retry' : reEvaluation.strategy === 'resume' ? 'Resume from artifact' : 'Re-scope with new questions'}</strong>
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.45, color: 'var(--dim)' }}>{reEvaluation.reasoning}</div>
+              </div>
+            )}
+
             <button onClick={onBack} className="btn-primary flex items-center justify-center gap-2.5" style={{ marginTop: 18, width: '100%', padding: 18, borderRadius: 16, fontSize: 16 }}>
               <CheckCircle size={18} weight="fill" /><span>Back to my plate</span>
             </button>
             {!solid && (
-              <button onClick={backToWork} className="btn-ghost" style={{ marginTop: 10, width: '100%', padding: 13, borderRadius: 14, fontSize: 15, fontWeight: 600 }}>Give it another 10 minutes</button>
+              <button onClick={retryFromReEval} className="btn-ghost" style={{ marginTop: 10, width: '100%', padding: 13, borderRadius: 14, fontSize: 15, fontWeight: 600 }}>
+                {reEvaluation ? (reEvaluation.strategy === 'quick_start' ? 'Quick 5-min retry' : reEvaluation.strategy === 'resume' ? 'Resume — another 10 minutes' : 'Re-scope this task') : 'Give it another 10 minutes'}
+              </button>
             )}
           </div>
         )}

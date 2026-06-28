@@ -1,9 +1,10 @@
 'use client'
 
-import { ArrowRight, Brain, CalendarPlus, CheckCircle, ClockCountdown, LinkSimple, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
+import { ArrowRight, Brain, CalendarPlus, CheckCircle, ClockCountdown, Crosshair, LinkSimple, MagnifyingGlass, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
 import { followUpMemory, latestFocusBlock, latestGroundedSources, overviewStats } from '@/lib/overview'
+import { HeroMesh } from './HeroMesh'
 
 interface Props {
   tasks: ClutchTask[]
@@ -21,9 +22,9 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
   const grounded = latestGroundedSources(tasks)
 
   return (
-    <main style={{ maxWidth: 1520, margin: '0 auto', padding: '0 clamp(24px,4.8vw,72px)' }}>
-      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '28px 0 34px', animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both' }}>
-        <header className="flex items-center justify-between gap-4" style={{ paddingTop: 4, paddingBottom: 18, borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+    <main style={{ maxWidth: 1600, margin: '0 auto', padding: '0 clamp(20px,3.2vw,48px)', overflow: 'hidden' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '24px 0 28px', animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both' }}>
+        <header className="flex items-center justify-between gap-4" style={{ paddingTop: 4, paddingBottom: 18 }}>
           <div className="flex items-center gap-3">
             <div style={{ width: 24, height: 24, borderRadius: '50%', border: '1.5px solid rgba(90,99,230,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 14px 2px rgba(90,99,230,.6)' }} />
@@ -37,18 +38,18 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
           )}
         </header>
 
-        <section style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(420px,.9fr) minmax(560px,1.1fr)', gap: 'clamp(42px,6vw,110px)', alignItems: 'center', padding: '42px 0 22px' }}>
-          <LightTrails />
-          <div style={{ position: 'relative', zIndex: 1 }}>
+        <section style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(500px,.82fr) minmax(650px,1.08fr)', gap: 'clamp(74px,6vw,112px)', alignItems: 'center', padding: '10px 0 14px' }}>
+          <HeroMesh />
+          <div style={{ position: 'relative', zIndex: 2, paddingTop: 10, transform: 'translateY(-36px)' }}>
             <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>AI accountability companion</span>
-            <h1 className="clutch-hero-title" style={{ fontSize: 'clamp(92px,11vw,190px)', marginBottom: 30 }}>
-              <span className="hero-title-white">CLU</span><span className="hero-title-blue">TCH</span>
+            <h1 className="clutch-hero-title" style={{ fontSize: 'clamp(86px,7.5vw,134px)', marginBottom: 18 }}>
+              CLUTCH
             </h1>
-            <p style={{ fontSize: 'clamp(28px,2.8vw,46px)', lineHeight: 1.12, color: 'rgba(243,245,244,.94)', maxWidth: '18ch', marginBottom: 22, fontWeight: 800 }}>
-              The app that steps in before your <span style={{ color: '#5268d8', textShadow: '0 0 26px rgba(82,104,216,.32)' }}>deadline slips.</span>
+            <p style={{ fontSize: 'clamp(28px,2.25vw,42px)', lineHeight: 1.16, color: 'rgba(243,245,244,.9)', maxWidth: '20ch', marginBottom: 20, fontWeight: 500, letterSpacing: 0 }}>
+              The app that steps in before your <span style={{ color: '#4f83ff', textShadow: '0 0 24px rgba(0,136,255,.38)' }}>deadline slips.</span>
             </p>
-            <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--dim)', maxWidth: '43ch', marginBottom: 34 }}>
-              Dump the mess. Clutch finds the riskiest commitment, asks what matters, starts the smallest useful move, and verifies proof before it gives you credit.
+            <p style={{ fontSize: 17, lineHeight: 1.55, color: 'rgba(243,245,244,.62)', maxWidth: '46ch', marginBottom: 34 }}>
+              Real AI accountability that helps you plan with clarity, follow through with evidence, and learn from every cycle.
             </p>
 
             <div className="flex flex-wrap gap-3" style={{ marginBottom: 30 }}>
@@ -63,15 +64,18 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
               )}
             </div>
 
-            <div className="flex flex-wrap" style={{ gap: 10 }}>
+            <div className="hero-feature-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))', gap: 0, maxWidth: 620 }}>
               {[
-                ['Gemini plans', Brain],
-                ['Focus timer', ClockCountdown],
-                ['Proof gate', ShieldCheck],
-              ].map(([label, Icon]) => (
-                <div key={label as string} className="inline-flex items-center gap-2" style={{ padding: '8px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.09)', background: 'rgba(255,255,255,.04)', color: 'var(--dim)', fontSize: 13 }}>
-                  <Icon size={15} color="var(--accent)" weight="fill" />
-                  <span>{label as string}</span>
+                ['Follow-up memory', 'Picks up where you left off', CheckCircle],
+                ['Risk detection', "Flags what's most likely to slip", Crosshair],
+                ['Gemini planning', 'Function-calling for day plans', Brain],
+                ['Grounded answers', 'Backed by real sources', MagnifyingGlass],
+                ['Proof that counts', 'Accepted, partial, or rejected', ShieldCheck],
+              ].map(([label, detail, Icon]) => (
+                <div key={label as string} className="hero-feature">
+                  <Icon size={28} color="#7f93ff" weight="regular" />
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(243,245,244,.82)', marginTop: 8 }}>{label as string}</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.35, color: 'rgba(243,245,244,.48)', marginTop: 4 }}>{detail as string}</div>
                 </div>
               ))}
             </div>
@@ -84,119 +88,46 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
   )
 }
 
-function LightTrails() {
-  const paths = [
-    'M 140 330 C 260 250, 360 210, 510 245 S 790 330, 1040 260',
-    'M 120 380 C 300 320, 430 285, 590 320 S 830 410, 1080 340',
-    'M 155 430 C 320 390, 470 360, 625 390 S 850 485, 1095 430',
-    'M 120 490 C 315 465, 455 445, 625 470 S 860 555, 1110 520',
-    'M 165 550 C 350 540, 515 520, 670 540 S 890 620, 1110 610',
-    'M 235 285 C 405 245, 515 235, 660 265 S 845 300, 1050 215',
-    'M 230 610 C 400 615, 530 600, 685 615 S 900 690, 1090 710',
-    'M 175 350 C 360 350, 485 385, 635 420 S 860 435, 1110 370',
-    'M 210 470 C 385 430, 500 405, 650 425 S 900 505, 1115 475',
-  ]
-  const nodes = [
-    [470, 248, '#72b7ff', 3],
-    [610, 319, '#78c8ff', 4],
-    [735, 390, '#e0b15a', 5],
-    [865, 490, '#7bbcff', 3],
-    [520, 544, '#6d7cff', 3],
-    [980, 338, '#81d7ff', 3],
-    [1035, 608, '#e0b15a', 4],
-  ] as const
-  return (
-    <div className="hero-mesh" aria-hidden="true">
-      <svg viewBox="0 0 1200 760" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
-        <defs>
-          <radialGradient id="meshCore" cx="55%" cy="48%" r="52%">
-            <stop offset="0%" stopColor="rgba(82,142,255,.32)" />
-            <stop offset="48%" stopColor="rgba(90,99,230,.18)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-          </radialGradient>
-          <linearGradient id="meshBlue" x1="0%" y1="50%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="rgba(54,101,255,0)" />
-            <stop offset="24%" stopColor="rgba(62,112,255,.2)" />
-            <stop offset="52%" stopColor="rgba(80,190,255,.92)" />
-            <stop offset="78%" stopColor="rgba(107,91,255,.64)" />
-            <stop offset="100%" stopColor="rgba(54,101,255,0)" />
-          </linearGradient>
-          <linearGradient id="meshViolet" x1="0%" y1="50%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="rgba(89,78,255,0)" />
-            <stop offset="38%" stopColor="rgba(105,91,255,.58)" />
-            <stop offset="66%" stopColor="rgba(195,105,255,.72)" />
-            <stop offset="100%" stopColor="rgba(89,78,255,0)" />
-          </linearGradient>
-          <linearGradient id="meshAmber" x1="0%" y1="50%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="rgba(224,177,90,0)" />
-            <stop offset="48%" stopColor="rgba(224,177,90,.18)" />
-            <stop offset="70%" stopColor="rgba(224,177,90,.78)" />
-            <stop offset="100%" stopColor="rgba(224,177,90,0)" />
-          </linearGradient>
-          <filter id="meshGlow" x="-35%" y="-80%" width="170%" height="260%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.25 0 0 0 0 0.45 0 0 0 0 1 0 0 0 .9 0" result="glow" />
-            <feMerge>
-              <feMergeNode in="glow" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          <filter id="nodeGlow" x="-300%" y="-300%" width="700%" height="700%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <rect x="0" y="0" width="1200" height="760" fill="url(#meshCore)" opacity=".78" />
-        <g filter="url(#meshGlow)">
-          {paths.map((d, i) => (
-            <path
-              key={d}
-              d={d}
-              className="mesh-path"
-              pathLength="100"
-              stroke={i % 5 === 2 ? 'url(#meshAmber)' : i % 3 === 1 ? 'url(#meshViolet)' : 'url(#meshBlue)'}
-              strokeWidth={i % 4 === 0 ? 2.4 : 1.45}
-              strokeLinecap="round"
-              fill="none"
-              opacity={i % 5 === 2 ? .78 : .88}
-              style={{ animationDelay: `${i * -0.7}s` }}
-            />
-          ))}
-        </g>
-        <g filter="url(#nodeGlow)">
-          {nodes.map(([cx, cy, fill, r], i) => (
-            <circle key={`${cx}-${cy}`} className="mesh-node" cx={cx} cy={cy} r={r} fill={fill} opacity=".95" style={{ animationDelay: `${i * -.5}s` }} />
-          ))}
-        </g>
-      </svg>
-    </div>
-  )
-}
-
 function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groundedCount }: { tasks: ClutchTask[]; topTitle?: string; risk: number | null; stats: ReturnType<typeof overviewStats>; followUp?: string; focusBlock?: number; groundedCount: number }) {
   const hasData = tasks.length > 0
   return (
-    <div style={{ position: 'relative', zIndex: 1, perspective: 1400 }}>
-      <div className="glass" style={{ borderRadius: 30, padding: 24, minHeight: 530, transform: 'rotateY(-11deg) rotateZ(1.5deg)', transformOrigin: 'center', background: 'linear-gradient(135deg, rgba(255,255,255,.07), rgba(255,255,255,.035))', border: '1px solid rgba(111,132,255,.28)', boxShadow: '0 42px 120px -42px rgba(0,0,0,.9), 0 0 95px -34px rgba(90,99,230,.95), inset 0 1px 0 rgba(255,255,255,.08)' }}>
-        <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
-          <div>
-            <div className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 5 }}>Live overview</div>
-            <div style={{ fontSize: 21, fontWeight: 800 }}>{hasData ? 'Your rescue dashboard' : 'No tasks yet'}</div>
+    <div className="hero-dashboard-wrap" style={{ position: 'relative', zIndex: 2, perspective: 1500, transform: 'translateY(-46px)' }}>
+      <div className="glass hero-dashboard" style={{ borderRadius: 18, minHeight: 650, transform: 'rotateY(-8.5deg) rotateZ(1.05deg)', transformOrigin: 'center', background: 'linear-gradient(135deg, rgba(4,9,18,.86), rgba(2,5,12,.72))', border: '1px solid rgba(150,170,210,.3)', boxShadow: '0 48px 140px -46px rgba(0,0,0,1), 0 0 90px -50px rgba(0,136,255,.7), inset 0 1px 0 rgba(255,255,255,.08)', overflow: 'hidden', display: 'grid', gridTemplateColumns: '148px minmax(0,1fr)' }}>
+        <aside style={{ borderRight: '1px solid rgba(255,255,255,.08)', padding: '22px 16px', display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,.26)' }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+            <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1px solid rgba(77,200,255,.7)', display: 'grid', placeItems: 'center' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
+            </div>
+            <span className="mono" style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.14em' }}>CLUTCH</span>
           </div>
-          <div className="mono" style={{ color: risk ? 'var(--warn)' : 'var(--faint)', fontSize: 13 }}>{risk ? `${risk}% risk` : 'waiting'}</div>
-        </div>
+          {['Dashboard', 'My Tasks', 'Brain Dump', 'Day Plan', 'Focus Timer', 'Proof & Verdicts', 'Memory', 'Grounded'].map((item, index) => (
+            <div key={item} style={{ borderRadius: 8, padding: '8px 10px', background: index === 0 ? 'rgba(0,88,255,.38)' : 'transparent', color: index === 0 ? '#fff' : 'rgba(243,245,244,.62)', fontSize: 12, fontWeight: 700 }}>
+              {item}
+            </div>
+          ))}
+          <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(243,245,244,.58)', fontSize: 11 }}>
+            <div style={{ width: 25, height: 25, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,.08)' }}>AS</div>
+            <span>Alex Smith</span>
+          </div>
+        </aside>
+        <div style={{ padding: 24 }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 18 }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 2 }}>{hasData ? 'Good evening, Alex' : 'Your rescue dashboard'}</div>
+              <div style={{ color: 'var(--dim)', fontSize: 12 }}>Here&apos;s your accountability snapshot.</div>
+            </div>
+            <div className="mono" style={{ color: risk ? 'var(--warn)' : 'var(--faint)', fontSize: 13 }}>{risk ? `${risk}% risk` : 'waiting'}</div>
+          </div>
+          <div className="mono" style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(243,245,244,.66)', marginBottom: 8 }}>Accountability Dashboard</div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 8, marginBottom: 13 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 13 }}>
           <PreviewMetric label="follow" value={stats.followThrough} />
           <PreviewMetric label="proof" value={String(stats.accepted)} />
           <PreviewMetric label="off-task" value={`${stats.offTaskMinutes}m`} />
           <PreviewMetric label="rescued" value={String(stats.rescued)} />
         </div>
 
-        <div style={{ borderRadius: 18, border: '1px solid rgba(90,99,230,.22)', background: 'rgba(90,99,230,.075)', padding: 15, marginBottom: 12 }}>
+        <div style={{ borderRadius: 13, border: '1px solid rgba(224,177,90,.45)', background: 'rgba(224,177,90,.055)', padding: 15, marginBottom: 12 }}>
           <div className="flex items-center gap-2" style={{ color: 'var(--accent)', marginBottom: 8 }}>
             <WarningOctagon size={16} weight="fill" />
             <span className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Most likely to blow up</span>
@@ -217,6 +148,7 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
             {followUp ? <CalendarPlus size={17} weight="bold" /> : <CheckCircle size={18} weight="fill" />}
             <span>{followUp ?? 'No proof, no fake completion.'}</span>
           </div>
+        </div>
         </div>
       </div>
     </div>

@@ -140,6 +140,11 @@ export interface DayPlan {
   audit: { label: string; detail: string }[]
 }
 
+export interface InterventionDecision {
+  strategy: 'scope_first' | 'resume' | 'quick_start'
+  reasoning: string
+}
+
 type TaskCtx = Pick<ClutchTask, 'title' | 'deadline' | 'effort' | 'category' | 'deferralCount'> &
   Partial<Pick<ClutchTask, 'openedThenBailed' | 'progressNotes' | 'commitments' | 'artifact'>>
 
@@ -157,6 +162,63 @@ function taskSignals(task: TaskCtx): string {
     notes.length ? `recent progress: ${notes.join(' | ')}` : 'recent progress: none',
     outcomes.length ? `recent commitments: ${outcomes.join(' | ')}` : 'recent commitments: none',
   ].join(', ')
+}
+
+export async function chooseIntervention(task: TaskCtx): Promise<InterventionDecision> {
+  const fallback = fallbackIntervention(task)
+  const recentCommitments = (task.commitments ?? [])
+    .slice(-4)
+    .map((c) => ({
+      action: c.action,
+      durationMin: c.durationMin,
+      outcomeStatus: c.outcome?.status ?? null,
+      reviewVerdict: c.outcome?.reviewVerdict ?? null,
+      reviewSolid: c.outcome?.reviewSolid ?? null,
+      reviewReaction: c.outcome?.reviewReaction ?? null,
+    }))
+
+  try {
+    const response = await withGeminiResilience('choose intervention', () => getClient().models.generateContent({
+      model: MODEL,
+      contents: `You are Clutch's intervention router. Decide which intervention path should happen BEFORE the app asks questions.
+
+Choose exactly one strategy:
+- scope_first: use when the task is new, vague, or lacks enough history. Ask scope questions before generating an artifact.
+- resume: use when there is a prior artifact or a prior commitment with partial/rejected proof. Pick up from the last attempt instead of restarting from scratch.
+- quick_start: use when the user repeatedly defers or opens-then-bails. Remove friction with a tiny 5-minute action and no scope questions.
+
+Do not optimize for sounding helpful. Optimize for the lowest-friction path that will get this specific user moving.
+
+Task: "${task.title}"
+Signals: ${taskSignals(task)}
+Has artifact: ${Boolean(task.artifact)}
+Recent commitments JSON: ${JSON.stringify(recentCommitments)}
+
+Return JSON with a strategy and one concise sentence explaining the behavioral reason.`,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            strategy: { type: 'string', enum: ['scope_first', 'resume', 'quick_start'] },
+            reasoning: { type: 'string' },
+          },
+          required: ['strategy', 'reasoning'],
+          propertyOrdering: ['strategy', 'reasoning'],
+        },
+      },
+    }))
+    const parsed = parseJSON(response.text, fallback) as Partial<InterventionDecision>
+    const strategy = parsed.strategy === 'resume' || parsed.strategy === 'quick_start' || parsed.strategy === 'scope_first'
+      ? parsed.strategy
+      : fallback.strategy
+    return {
+      strategy,
+      reasoning: parsed.reasoning?.trim() || fallback.reasoning,
+    }
+  } catch {
+    return fallback
+  }
 }
 
 /**
@@ -395,6 +457,26 @@ function fallbackQuestions(task: TaskCtx): string[] {
     'What is the smallest version that would still count?',
     'What are you avoiding: unclear scope, fear it will fail, boredom, or not knowing how?',
   ]
+}
+
+function fallbackIntervention(task: TaskCtx): InterventionDecision {
+  const latestOutcome = [...(task.commitments ?? [])].reverse().find((c) => c.outcome)?.outcome
+  if ((latestOutcome?.reviewVerdict === 'partial' || latestOutcome?.reviewVerdict === 'rejected') || (task.artifact && (task.commitments ?? []).length > 0)) {
+    return {
+      strategy: 'resume',
+      reasoning: 'Prior proof or artifact exists, so the lowest-friction move is to resume instead of restarting the scope flow.',
+    }
+  }
+  if (task.deferralCount >= 3 || (task.openedThenBailed ?? 0) >= 2) {
+    return {
+      strategy: 'quick_start',
+      reasoning: 'Repeated deferrals or bailouts suggest friction is the blocker, so Clutch should skip questions and start with a tiny action.',
+    }
+  }
+  return {
+    strategy: 'scope_first',
+    reasoning: 'There is not enough behavioral history yet, so Clutch should ask targeted scope questions before generating the action.',
+  }
 }
 
 function fallbackAction(task: TaskCtx, qa: QAPair[]): ActionPlan {
@@ -655,4 +737,101 @@ export async function generateReflection(
 
   const parsed = JSON.parse(response.text ?? '{}') as { summary: string; observation: string }
   return { ...parsed, focusScore }
+}
+
+export interface MorningBriefing {
+  greeting: string
+  topRisk: string
+  nudge: string
+  /** Visible explanation of how the briefing was constructed. */
+  audit: { label: string; detail: string }[]
+}
+
+/**
+ * Generate a proactive morning briefing from current task + behavioral data.
+ * This demonstrates what CLUTCH would send as a push notification or email digest.
+ */
+export async function morningBriefing(
+  tasks: ClutchTask[],
+  followThrough: { committed: number; completed: number },
+): Promise<MorningBriefing> {
+  const active = tasks.filter((t) => t.status !== 'done' && t.status !== 'dropped')
+  const fallback = fallbackMorningBriefing(active, followThrough)
+  if (active.length === 0) return fallback
+
+  const ranked = rankTasks(tasks, Date.now()).slice(0, 3)
+  const staleCommitments = active
+    .flatMap((t) => t.commitments.filter((c) => c.outcome && (c.outcome.reviewVerdict === 'partial' || c.outcome.reviewVerdict === 'rejected')).map((c) => ({ task: t.title, action: c.action, verdict: c.outcome!.reviewVerdict })))
+    .slice(0, 3)
+  const rate = followThrough.committed > 0 ? Math.round((followThrough.completed / followThrough.committed) * 100) : null
+  const hour = new Date().getHours()
+  const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+
+  try {
+    const response = await withGeminiResilience('morning briefing', () => getClient().models.generateContent({
+      model: MODEL,
+      contents: `You are Clutch writing a proactive ${timeOfDay} briefing — the kind that would arrive as a push notification or email digest before the user even opens the app. Be honest, specific, and concise. No filler.
+
+Top risk-ranked tasks:
+${ranked.map((r) => `- "${r.task.title}" (risk ${r.score}, reason: ${r.reason}, deferred ${r.task.deferralCount}x, bailed ${r.task.openedThenBailed}x)`).join('\n')}
+
+Unfinished proof:
+${staleCommitments.length > 0 ? staleCommitments.map((s) => `- "${s.task}": committed to "${s.action}", verdict was ${s.verdict}`).join('\n') : '(none)'}
+
+Follow-through rate: ${rate !== null ? `${rate}%` : 'no commitments yet'}
+
+Return:
+- greeting: a short, time-aware opening (1 sentence, reference the time of day)
+- topRisk: 1-2 sentences naming the single most dangerous item and why it needs attention RIGHT NOW, referencing real signals
+- nudge: 1 sentence — the one concrete action to start with`,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            greeting: { type: 'string' },
+            topRisk: { type: 'string' },
+            nudge: { type: 'string' },
+          },
+          required: ['greeting', 'topRisk', 'nudge'],
+          propertyOrdering: ['greeting', 'topRisk', 'nudge'],
+        },
+      },
+    }))
+    const parsed = parseJSON(response.text, fallback) as Pick<MorningBriefing, 'greeting' | 'topRisk' | 'nudge'>
+    return {
+      ...parsed,
+      audit: [
+        { label: 'generateMorningBriefing', detail: `Analyzed ${active.length} active task(s), ${staleCommitments.length} unresolved proof(s), and a ${rate ?? 0}% follow-through rate.` },
+        { label: 'rankByRisk', detail: `Top risk: "${ranked[0]?.task.title}" at score ${ranked[0]?.score}.` },
+      ],
+    }
+  } catch {
+    return fallback
+  }
+}
+
+function fallbackMorningBriefing(
+  active: ClutchTask[],
+  followThrough: { committed: number; completed: number },
+): MorningBriefing {
+  const hour = new Date().getHours()
+  const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+  const ranked = rankTasks(active, Date.now())
+  const top = ranked[0]
+  const rate = followThrough.committed > 0 ? Math.round((followThrough.completed / followThrough.committed) * 100) : null
+  return {
+    greeting: active.length > 0
+      ? `Good ${timeOfDay}. You have ${active.length} active task${active.length === 1 ? '' : 's'} and ${rate !== null ? `a ${rate}% follow-through rate` : 'no commitments logged yet'}.`
+      : `Good ${timeOfDay}. Nothing active — dump what's on your mind when something starts to feel risky.`,
+    topRisk: top
+      ? `"${top.task.title}" is the most likely to slip — ${top.reason.toLowerCase()}. ${top.task.deferralCount > 0 ? `You've walked past it ${top.task.deferralCount} time${top.task.deferralCount > 1 ? 's' : ''}.` : 'It has no progress yet.'}`
+      : 'No tasks at risk right now.',
+    nudge: top
+      ? `Open "${top.task.title}" and produce proof before anything else.`
+      : 'Add a brain dump when something starts to build up.',
+    audit: [
+      { label: 'fallbackMorningBriefing', detail: 'Used deterministic briefing because Gemini was unavailable.' },
+    ],
+  }
 }

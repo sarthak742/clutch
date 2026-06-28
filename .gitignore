@@ -30,3 +30,8 @@ Thumbs.db
 
 # local reference material
 Vibe2Ship - Problem Statements & Submission Guidelines.docx
+Transcript.docx
+~$*.docx
+
+# local visual scratch previews
+public/mesh-preview.html

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import { ArrowRight, ArrowUUpLeft, BellRinging, CalendarPlus, CalendarX, ChartLineUp, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
@@ -552,7 +552,7 @@ function MorningScreen({ briefing, loading, onGenerate, analytics, top, onEngage
           <span className="mono" style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--accent)' }}>Proactive digest preview</span>
         </div>
         <p style={{ color: 'var(--dim)', lineHeight: 1.6, fontSize: 14.5, marginBottom: 16 }}>
-          This is what CLUTCH would send you as a morning push notification or email digest â€” a proactive nudge generated from your task risk, behavioral memory, and proof history, before you even open the app.
+          This is what CLUTCH would send you as a morning push notification or email digest — a proactive nudge generated from your task risk, behavioral memory, and proof history, before you even open the app.
         </p>
         <button onClick={onGenerate} className="btn-primary" style={{ width: '100%', padding: 15, borderRadius: 14 }}>
           {loading ? 'Generating briefing with Gemini...' : briefing ? 'Regenerate briefing' : 'Generate morning briefing'}

@@ -45,8 +45,10 @@ export default function Home() {
     setView('briefing')
   }
 
+  const isDemoLoaded = tasks.some((t) => t.id.startsWith('demo-'))
+
   const handleLoadDemo = () => {
-    if (tasks.length > 0) return
+    if (tasks.length > 0 || isDemoLoaded) return
     const demo = createDemoState()
     setFollowThrough(demo.followThrough)
     persist(demo.tasks, demo.followThrough)
@@ -87,7 +89,7 @@ export default function Home() {
                 followThrough={followThrough}
                 onStart={() => setView(tasks.length > 0 ? 'briefing' : 'capture')}
                 onAddMore={tasks.length > 0 ? () => setView('capture') : undefined}
-                onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined}
+                onLoadDemo={tasks.length === 0 && !isDemoLoaded ? handleLoadDemo : undefined}
               />
             </motion.div>
           )}
@@ -97,7 +99,7 @@ export default function Home() {
               <Capture
                 hasExisting={tasks.length > 0}
                 onParsed={handleParsed}
-                onLoadDemo={tasks.length === 0 ? handleLoadDemo : undefined}
+                onLoadDemo={tasks.length === 0 && !isDemoLoaded ? handleLoadDemo : undefined}
                 onCancel={tasks.length > 0 ? () => setView('briefing') : () => setView('landing')}
               />
             </motion.div>

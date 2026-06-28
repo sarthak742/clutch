@@ -114,7 +114,7 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
       onMouseMove={handleMouseMove}
       onClick={() => setShowNotice(true)}
       className="hero-dashboard-wrap"
-      style={{ position: 'relative', zIndex: 2, perspective: 1500, transform: 'translateY(-46px)', cursor: 'default' }}
+      style={{ position: 'relative', zIndex: 2, perspective: 1500, transform: 'translateY(40px)', cursor: 'default' }}
     >
       <div className="glass hero-dashboard" style={{ borderRadius: 18, minHeight: 650, transform: 'rotateY(-8.5deg) rotateZ(1.05deg)', transformOrigin: 'center', background: 'linear-gradient(135deg, rgba(4,9,18,.86), rgba(2,5,12,.72))', border: '1px solid rgba(150,170,210,.3)', boxShadow: '0 48px 140px -46px rgba(0,0,0,1), 0 0 90px -50px rgba(0,136,255,.7), inset 0 1px 0 rgba(255,255,255,.08)', overflow: 'hidden', display: 'grid', gridTemplateColumns: '148px minmax(0,1fr)' }}>
         <aside style={{ borderRight: '1px solid rgba(255,255,255,.08)', padding: '22px 16px', display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,.26)' }}>

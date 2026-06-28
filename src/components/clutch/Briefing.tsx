@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { ArrowRight, ArrowUUpLeft, BellRinging, CalendarPlus, CalendarX, ChartLineUp, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
@@ -24,16 +24,22 @@ function dotColor(score: number) {
   return { c: 'var(--accent)', g: 'rgba(90,99,230,.5)' }
 }
 
-const screenCopy: Record<Screen, { title: string; subtitle: string }> = {
-  dashboard: { title: 'Good evening, Alex', subtitle: 'Here is your real accountability snapshot.' },
+function getDashboardGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning.'
+  if (hour < 17) return 'Good afternoon.'
+  return 'Good evening.'
+}
+
+const screenCopy: Record<Exclude<Screen, 'dashboard'>, { title: string; subtitle: string }> = {
   morning: { title: 'Morning Briefing', subtitle: 'What CLUTCH would send as a proactive push notification or email digest.' },
   tasks: { title: 'My Tasks', subtitle: 'Every commitment ranked by deadline, avoidance, effort, and history.' },
   brain: { title: 'Brain Dump', subtitle: 'Add the messy list. Clutch turns it into ranked commitments.' },
-  day: { title: 'Day Plan', subtitle: 'A real Gemini function-calling round trip for planning the day.' },
+  day: { title: 'Day Plan', subtitle: 'A visible planning tool call that ranks today by risk, time, and avoidance.' },
   focus: { title: 'Focus Block', subtitle: 'Calendar handoff and timer context created when you commit.' },
-  proof: { title: 'Proof & Verdicts', subtitle: 'Completion only counts when the proof matches the task.' },
+  proof: { title: 'Show Your Work', subtitle: 'Completion only counts when the evidence matches the task.' },
   memory: { title: 'Memory', subtitle: 'Behavioral signals Clutch uses to pick up where you left off.' },
-  grounded: { title: 'Grounded', subtitle: 'References saved from Gemini Search grounding when a task needs sources.' },
+  grounded: { title: 'Sources', subtitle: 'References saved when a task needs current or factual support.' },
 }
 
 export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }: Props) {
@@ -50,7 +56,9 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
   const followUp = followUpMemory(tasks, now)
   const focusBlock = latestFocusBlock(tasks)
   const grounded = latestGroundedSources(tasks)
-  const screenInfo = screenCopy[screen]
+
+  const screenTitle = screen === 'dashboard' ? getDashboardGreeting() : screenCopy[screen].title
+  const screenSubtitle = screen === 'dashboard' ? 'Here is your real accountability snapshot.' : screenCopy[screen].subtitle
 
   const rate =
     followThrough.committed > 0
@@ -96,9 +104,9 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
     { screen: 'brain', label: 'Brain Dump' },
     { screen: 'day', label: 'Day Plan' },
     { screen: 'focus', label: 'Focus Block' },
-    { screen: 'proof', label: 'Proof & Verdicts' },
+    { screen: 'proof', label: 'Show Your Work' },
     { screen: 'memory', label: 'Memory' },
-    { screen: 'grounded', label: 'Grounded' },
+    { screen: 'grounded', label: 'Sources' },
   ]
 
   return (
@@ -150,17 +158,13 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
                   </button>
                 )
               })}
-              <div style={{ marginTop: 'auto', paddingTop: 16, display: 'flex', alignItems: 'center', gap: 9, color: 'rgba(243,245,244,.58)', fontSize: 12 }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,.08)' }}>AS</div>
-                <span>Accountability session</span>
-              </div>
             </aside>
 
             <section style={{ padding: '24px clamp(18px,2.2vw,32px) 28px', minWidth: 0 }}>
               <div className="flex items-start justify-between gap-4" style={{ marginBottom: 18 }}>
                 <div>
-                  <h2 style={{ fontSize: 26, lineHeight: 1.05, fontWeight: 850, marginBottom: 6 }}>{screenInfo.title}</h2>
-                  <p style={{ color: 'var(--dim)', fontSize: 14 }}>{screenInfo.subtitle}</p>
+                  <h2 style={{ fontSize: 26, lineHeight: 1.05, fontWeight: 850, marginBottom: 6 }}>{screenTitle}</h2>
+                  <p style={{ color: 'var(--dim)', fontSize: 14 }}>{screenSubtitle}</p>
                 </div>
                 <span className="mono" style={{ color: dotColor(top.score).c, fontSize: 13 }}>{Math.min(99, Math.max(15, Math.round(top.score)))}% risk</span>
               </div>
@@ -193,7 +197,7 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
               )}
 
               {screen === 'day' && (
-                <DayPlanScreen dayPlan={dayPlan} planning={planning} onPlanDay={planDay} taskCount={tasks.length} />
+                <DayPlanScreen dayPlan={dayPlan} planning={planning} onPlanDay={planDay} taskCount={tasks.filter(t => t.status !== 'done' && t.status !== 'dropped').length} />
               )}
 
               {screen === 'focus' && (
@@ -261,10 +265,10 @@ function DashboardScreen({ analytics, followUp, focusBlock, grounded, top, rest,
 
         <div style={{ display: 'grid', gap: 10 }}>
           <button onClick={() => onScreen('proof')} style={{ border: 'none', background: 'transparent', color: 'inherit', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
-            <MiniPanel icon={<ShieldCheck size={18} weight="fill" />} label="Proof verdicts" title={`${analytics.accepted} accepted / ${analytics.partial} partial / ${analytics.rejected} rejected`} detail="Open the dedicated verdict screen." tone="var(--good)" />
+            <MiniPanel icon={<ShieldCheck size={18} weight="fill" />} label="Work reviews" title={`${analytics.accepted} accepted / ${analytics.partial} partial / ${analytics.rejected} rejected`} detail="Open reviewed work and evidence." tone="var(--good)" />
           </button>
           <button onClick={() => onScreen('grounded')} style={{ border: 'none', background: 'transparent', color: 'inherit', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
-            <MiniPanel icon={<LinkSimple size={18} weight="bold" />} label="Grounded refs" title={grounded ? `${grounded.sources.length} sources saved` : 'No sources yet'} detail={grounded ? grounded.task.title : 'Reference-heavy plans show citations after grounding.'} tone="var(--accent)" />
+            <MiniPanel icon={<LinkSimple size={18} weight="bold" />} label="Sources" title={grounded ? `${grounded.sources.length} sources saved` : 'No sources yet'} detail={grounded ? grounded.task.title : 'Research-heavy plans show citations here.'} tone="var(--accent)" />
           </button>
           <button onClick={() => onScreen('focus')} style={{ border: 'none', background: 'transparent', color: 'inherit', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
             <MiniPanel icon={<CalendarPlus size={18} weight="bold" />} label="Focus block" title={focusBlock ? `${focusBlock.commitment.durationMin} min calendar handoff` : 'Ready on commit'} detail={focusBlock ? focusBlock.task.title : 'Starting a timer creates a Google Calendar handoff link.'} tone="var(--accent)" />
@@ -338,16 +342,16 @@ function BrainDumpScreen({ onAddMore, taskCount }: { onAddMore: () => void; task
 function DayPlanScreen({ dayPlan, planning, onPlanDay, taskCount }: { dayPlan: DayPlan | null; planning: boolean; onPlanDay: () => void; taskCount: number }) {
   return (
     <div className="glass" style={{ borderRadius: 22, padding: 22, maxWidth: 780 }}>
-      <div className="mono" style={{ color: 'var(--accent)', fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', marginBottom: 10 }}>Gemini day plan</div>
-      <h3 style={{ fontSize: 26, lineHeight: 1.12, fontWeight: 850, marginBottom: 10 }}>Plan today from {taskCount} real task{taskCount === 1 ? '' : 's'}.</h3>
-      <p style={{ color: 'var(--dim)', lineHeight: 1.6, marginBottom: 18 }}>This is the isolated real Gemini function-calling feature. The core loop stays deterministic; this screen proves the Google tool call honestly.</p>
+      <div className="mono" style={{ color: 'var(--accent)', fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', marginBottom: 10 }}>Day planner</div>
+      <h3 style={{ fontSize: 26, lineHeight: 1.12, fontWeight: 850, marginBottom: 10 }}>Plan today from {taskCount} active task{taskCount === 1 ? '' : 's'}.</h3>
+      <p style={{ color: 'var(--dim)', lineHeight: 1.6, marginBottom: 18 }}>This runs the visible planning tool: rank the day, explain the choice, and summarize the next move.</p>
       <button onClick={onPlanDay} className="btn-primary" style={{ width: '100%', padding: 15, borderRadius: 14, marginBottom: 14 }}>
-        {planning ? 'Planning with Gemini function calling...' : 'Run Gemini day-plan function call'}
+        {planning ? 'Planning today...' : 'Plan my day'}
       </button>
       {dayPlan ? (
         <div style={{ padding: 16, borderRadius: 16, background: 'rgba(0,0,0,.24)', border: '1px solid rgba(255,255,255,.08)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: dayPlan.functionCalled ? 'var(--good)' : 'var(--warn)', marginBottom: 8 }}>
-            {dayPlan.functionCalled ? 'Function call verified' : 'Deterministic fallback used'}
+            {dayPlan.functionCalled ? 'Planning tool verified' : 'Local plan used'}
           </div>
           <p style={{ color: 'var(--dim)', lineHeight: 1.5, marginBottom: 10 }}>{dayPlan.summary}</p>
           <div style={{ color: 'rgba(243,245,244,.9)', fontWeight: 700 }}>{dayPlan.nextAction}</div>
@@ -457,7 +461,7 @@ function GroundedScreen({ grounded, tasks }: { grounded: ReturnType<typeof lates
           </div>
         </div>
       )) : (
-        <EmptyPanel title="No grounded references yet" detail={grounded ? grounded.task.title : 'Generate an action plan for an essay, study, how-to, or research task to save cited sources here.'} />
+        <EmptyPanel title="No sources yet" detail={grounded ? grounded.task.title : 'Generate an action plan for an essay, study, how-to, or research task to save cited sources here.'} />
       )}
     </div>
   )
@@ -548,7 +552,7 @@ function MorningScreen({ briefing, loading, onGenerate, analytics, top, onEngage
           <span className="mono" style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--accent)' }}>Proactive digest preview</span>
         </div>
         <p style={{ color: 'var(--dim)', lineHeight: 1.6, fontSize: 14.5, marginBottom: 16 }}>
-          This is what CLUTCH would send you as a morning push notification or email digest — a proactive nudge generated from your task risk, behavioral memory, and proof history, before you even open the app.
+          This is what CLUTCH would send you as a morning push notification or email digest â€” a proactive nudge generated from your task risk, behavioral memory, and proof history, before you even open the app.
         </p>
         <button onClick={onGenerate} className="btn-primary" style={{ width: '100%', padding: 15, borderRadius: 14 }}>
           {loading ? 'Generating briefing with Gemini...' : briefing ? 'Regenerate briefing' : 'Generate morning briefing'}
@@ -558,6 +562,19 @@ function MorningScreen({ briefing, loading, onGenerate, analytics, top, onEngage
       {briefing ? (
         <>
           <div className="glass" style={{ borderRadius: 22, padding: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px',
+                borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: '.08em',
+                background: briefing.audit.some(a => a.label === 'generateMorningBriefing') ? 'rgba(90,99,230,.12)' : 'rgba(255,255,255,.06)',
+                border: briefing.audit.some(a => a.label === 'generateMorningBriefing') ? '1px solid rgba(90,99,230,.3)' : '1px solid rgba(255,255,255,.1)',
+                color: briefing.audit.some(a => a.label === 'generateMorningBriefing') ? 'var(--accent)' : 'var(--faint)',
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: briefing.audit.some(a => a.label === 'generateMorningBriefing') ? 'var(--accent)' : 'rgba(255,255,255,.3)' }} />
+                {briefing.audit.some(a => a.label === 'generateMorningBriefing') ? 'Gemini 2.5 Flash live' : briefing.audit.some(a => a.label.includes('fallback')) ? 'AI fallback active' : 'Local plan'}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--faint)' }}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
             <div style={{ fontSize: 22, fontWeight: 850, lineHeight: 1.2, marginBottom: 14 }}>{briefing.greeting}</div>
             <div style={{ borderRadius: 16, background: 'rgba(224,177,90,.07)', border: '1px solid rgba(224,177,90,.3)', padding: 16, marginBottom: 14 }}>
               <div className="mono" style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--warn)', marginBottom: 8 }}>Top risk</div>
@@ -577,7 +594,7 @@ function MorningScreen({ briefing, loading, onGenerate, analytics, top, onEngage
 
           {briefing.audit.length > 0 && (
             <div className="glass" style={{ borderRadius: 18, padding: 16 }}>
-              <div className="mono" style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 10 }}>Agent audit trail</div>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 10 }}>Why Clutch chose this</div>
               <div className="flex flex-col" style={{ gap: 8 }}>
                 {briefing.audit.map((item, i) => (
                   <div key={`${item.label}-${i}`} className="flex gap-3" style={{ alignItems: 'flex-start' }}>

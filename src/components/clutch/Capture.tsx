@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { ArrowRight } from '@phosphor-icons/react'
@@ -11,7 +11,7 @@ interface Props {
   onCancel?: () => void
 }
 
-const PLACEHOLDER = 'essay due friday, call the dentist, taxes this month, reply to the landlord…'
+const PLACEHOLDER = 'essay due friday, call the dentist, taxes this month, reply to the landlordâ€¦'
 
 export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) {
   const [dump, setDump] = useState('')
@@ -54,7 +54,7 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 26, padding: '40px 0' }}>
             <div className="flex items-center gap-3">
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 18px 4px rgba(90,99,230,.7)', animation: 'breathe 1.6s ease-in-out infinite' }} />
-              <span style={{ fontSize: 16, color: 'var(--dim)' }}>Reading your mind…</span>
+              <span style={{ fontSize: 16, color: 'var(--dim)' }}>Sorting your tasks...</span>
             </div>
             <div className="flex flex-col" style={{ gap: 13 }}>
               {[0, 0.2, 0.4].map((d, i) => (
@@ -68,16 +68,17 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
           >
             <div className="flex flex-col">
               <h1 className="serif" style={{ fontWeight: 400, fontSize: 'clamp(44px,5.4vw,72px)', lineHeight: 1.02, letterSpacing: '-.015em', marginBottom: 22 }}>
-                {hasExisting ? 'What else is on your mind?' : 'What’s weighing on you?'}
+                {hasExisting ? 'What else is on your mind?' : 'Whatâ€™s weighing on you?'}
               </h1>
               <p style={{ fontSize: 18, lineHeight: 1.6, color: 'var(--dim)', maxWidth: '32ch' }}>
-                Dump it all out in plain words. Clutch sorts the chaos and decides what&apos;s about to blow up.
+                Dump it all out in plain words. Clutch turns the mess into tasks and flags what is most likely to slip.
               </p>
             </div>
 
             <div className="flex flex-col" style={{ gap: 18 }}>
               <div className="glass" style={{ borderRadius: 24 }}>
                 <textarea
+                  aria-label="Brain dump task list"
                   value={dump}
                   onChange={(e) => setDump(e.target.value)}
                   placeholder={PLACEHOLDER}
@@ -98,7 +99,7 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
               </button>
 
               <div className="flex items-center justify-between">
-                <span className="mono" style={{ fontSize: 11, color: 'var(--faint)' }}>⌘ / Ctrl + Enter</span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--faint)' }}>Cmd / Ctrl + Enter</span>
                 {!hasExisting && onLoadDemo && (
                   <button onClick={onLoadDemo} className="mono" style={{ fontSize: 12, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}>load demo scenario</button>
                 )}

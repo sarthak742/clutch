@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { ArrowLeft, ArrowRight, MagicWand, Timer, Play, Pause, Paperclip, Image as ImageIcon, CheckCircle, Eye, Warning, CalendarPlus } from '@phosphor-icons/react'
@@ -75,6 +75,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const [offTaskSeconds, setOffTaskSeconds] = useState(0)
   const [leftTabCount, setLeftTabCount] = useState(0)
   const [focusBlockUrl, setFocusBlockUrl] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const commitmentId = useRef<string | null>(null)
   const pendingStatus = useRef<CommitmentOutcome['status']>('done')
   const countedRef = useRef(false)
@@ -193,6 +194,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
 
   const requestAction = async (qa: QAPair[], note?: string, decision = intervention) => {
     setStep('acting')
+    setActionError(null)
     try {
       const res = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: ctx, qa, note }) })
       const payload = (await res.json()) as ActionPlan | { error: string }
@@ -203,7 +205,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
       onUpdateTask(task.id, { artifact: planWithRouter.artifact, groundedSources: planWithRouter.sources ?? task.groundedSources ?? [], agentTrace: planWithRouter.agentTrace ?? [], lastTouched: Date.now() })
       setStep('plan')
     } catch (e) {
-      alert(`Clutch couldn't work that out.\n\n${e instanceof Error ? e.message : String(e)}`)
+      setActionError(e instanceof Error ? e.message : String(e))
       setStep('scope')
     }
   }
@@ -212,6 +214,28 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     const qa: QAPair[] = (questions ?? []).map((q, i) => ({ question: q, answer: answers[i] ?? '' }))
     await requestAction(qa)
   }
+
+  // Restore timer from localStorage on mount (survives page refresh)
+  useEffect(() => {
+    const savedStart = localStorage.getItem('clutch_timer_start')
+    const savedMinutes = localStorage.getItem('clutch_timer_minutes')
+    const savedTaskId = localStorage.getItem('clutch_timer_task')
+    if (savedStart && savedMinutes && savedTaskId === task.id) {
+      const elapsed = Math.floor((Date.now() - Number(savedStart)) / 1000)
+      const total = Number(savedMinutes) * 60
+      const remaining = total - elapsed
+      if (remaining > 0) {
+        setTotalSeconds(total)
+        setSecondsLeft(remaining)
+        setMinutes(Number(savedMinutes))
+        setStep('work')
+      } else {
+        localStorage.removeItem('clutch_timer_start')
+        localStorage.removeItem('clutch_timer_minutes')
+        localStorage.removeItem('clutch_timer_task')
+      }
+    }
+  }, [task.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const commit = () => {
     if (!plan) return
@@ -231,6 +255,9 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
     setSecondsLeft(minutes * 60)
     setTotalSeconds(minutes * 60)
     setRunning(true)
+    localStorage.setItem('clutch_timer_start', String(Date.now()))
+    localStorage.setItem('clutch_timer_minutes', String(minutes))
+    localStorage.setItem('clutch_timer_task', task.id)
     setStep('work')
   }
 
@@ -256,6 +283,9 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   }
 
   const submitProof = async () => {
+    localStorage.removeItem('clutch_timer_start')
+    localStorage.removeItem('clutch_timer_minutes')
+    localStorage.removeItem('clutch_timer_task')
     const status = pendingStatus.current
     setStep('reviewing')
     let result: ProofReview | null = null
@@ -297,7 +327,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
         const reRes = await fetch('/api/intervene', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: reCtx }) })
         const rePayload = (await reRes.json()) as InterventionDecision | { error: string }
         if (reRes.ok && !('error' in rePayload)) setReEvaluation(rePayload)
-      } catch { /* silent — re-evaluation is additive */ }
+      } catch { /* silent â€” re-evaluation is additive */ }
     }
   }
 
@@ -334,7 +364,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const mmss = `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`
   const timerDeg = `${Math.min(360, ((totalSeconds - secondsLeft) / Math.max(1, totalSeconds)) * 360)}deg`
   const updateAnswer = (i: number, v: string) => setAnswers((a) => a.map((x, j) => (j === i ? v : x)))
-  const artifactLines = (plan?.artifact ?? '').split('\n').map((l) => l.replace(/^[\s>*\-•\d.]+/, '').trim()).filter(Boolean)
+  const artifactLines = (plan?.artifact ?? '').split('\n').map((l) => l.replace(/^[\s>*\-â€¢\d.]+/, '').trim()).filter(Boolean)
   const cur = stepIndex(step)
   const reviewVerdict = review?.verdict === 'accepted' && review.solid ? 'accepted' : review?.verdict === 'partial' ? 'partial' : 'rejected'
   const solid = reviewVerdict === 'accepted'
@@ -346,7 +376,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
       <div style={{ animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both', display: 'flex', flexDirection: 'column', minHeight: '100dvh', padding: '24px 0 44px' }}>
         {/* Header: back + step dots + counter */}
         <div className="flex items-center gap-3.5" style={{ paddingTop: 8, marginBottom: 6 }}>
-          <button onClick={leaveEngage} aria-label="Back" className="btn-ghost flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0 }}>
+          <button onClick={leaveEngage} aria-label="Back to task list" title="Back to task list" className="btn-ghost flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0 }}>
             <ArrowLeft size={17} weight="bold" />
           </button>
           <div className="flex gap-1.5" style={{ flex: 1 }}>
@@ -363,11 +393,11 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
           <div style={{ animation: 'stepIn .62s cubic-bezier(.2,.65,.25,1) both', flex: 1, display: 'flex', flexDirection: 'column', paddingTop: 14 }}>
             <span className="eyebrow" style={{ marginBottom: 10 }}>Scope it</span>
             <h2 className="serif" style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.1, marginBottom: 8 }}>First, a few questions.</h2>
-            <p style={{ fontSize: 15, color: 'var(--dim)', marginBottom: 24, maxWidth: '32ch' }}>I need the specifics to actually help — not generic advice. Answer these and I&apos;ll build you a real starting point.</p>
+            <p style={{ fontSize: 15, color: 'var(--dim)', marginBottom: 24, maxWidth: '32ch' }}>I need the specifics to actually help â€” not generic advice. Answer these and I&apos;ll build you a real starting point.</p>
             {!questions ? (
               <div className="flex items-center gap-3" style={{ minHeight: 120 }}>
                 <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 14px 3px rgba(90,99,230,.6)', animation: 'breathe 1.6s ease-in-out infinite' }} />
-                <span style={{ color: 'var(--dim)' }}>Working out what I need to know…</span>
+                <span style={{ color: 'var(--dim)' }}>Working out what I need to knowâ€¦</span>
               </div>
             ) : (
               <>
@@ -376,9 +406,10 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                     <div key={i} className="glass" style={{ borderRadius: 20, padding: 18 }}>
                       <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 14, lineHeight: 1.3 }}>{q}</div>
                       <input
+                        aria-label={`Answer question ${i + 1}: ${q}`}
                         value={answers[i] ?? ''}
                         onChange={(e) => updateAnswer(i, e.target.value)}
-                        placeholder="Type your answer…"
+                        placeholder="Type your answerâ€¦"
                         style={{ width: '100%', background: 'rgba(0,0,0,.2)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, padding: '13px 15px', color: 'var(--text)', fontSize: 15, outline: 'none', transition: 'border-color .2s' }}
                         onFocus={(e) => (e.target.style.borderColor = 'rgba(90,99,230,.5)')}
                         onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,.1)')}
@@ -386,10 +417,16 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                     </div>
                   ))}
                 </div>
+                {actionError && (
+                  <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,90,90,.08)', border: '1px solid rgba(255,90,90,.35)', color: '#ff9a9a', fontSize: 14, lineHeight: 1.5 }}>
+                    <strong style={{ display: 'block', marginBottom: 4 }}>Couldn\'t build your move</strong>
+                    {actionError}
+                  </div>
+                )}
                 <button onClick={act} className="btn-primary flex items-center justify-center gap-2.5" style={{ marginTop: 20, padding: 18, borderRadius: 16, fontSize: 16 }}>
                   <span>Build my move</span><ArrowRight size={18} weight="bold" />
                 </button>
-                <button onClick={act} className="mono" style={{ marginTop: 12, padding: 0, background: 'none', border: 'none', color: 'var(--faint)', fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>skip — just give me something</button>
+                <button onClick={act} className="mono" style={{ marginTop: 12, padding: 0, background: 'none', border: 'none', color: 'var(--faint)', fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>skip â€” just give me something</button>
               </>
             )}
           </div>
@@ -399,7 +436,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
         {step === 'acting' && (
           <div className="flex items-center justify-center gap-3" style={{ flex: 1, minHeight: 200 }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 18px 4px rgba(90,99,230,.7)', animation: 'breathe 1.6s ease-in-out infinite' }} />
-            <span style={{ color: 'var(--dim)' }}>Clutch is building your move…</span>
+            <span style={{ color: 'var(--dim)' }}>Clutch is building your moveâ€¦</span>
           </div>
         )}
 
@@ -411,13 +448,26 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
 
             {plan.agentTrace && plan.agentTrace.length > 0 && (
               <div className="glass" style={{ borderRadius: 18, padding: 16, marginBottom: 18 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>Agent audit trail</div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>Why Clutch chose this</div>
                 <div className="flex flex-col" style={{ gap: 10 }}>
                   {plan.agentTrace.map((item, i) => (
                     <div key={`${item.label}-${i}`} className="flex gap-3" style={{ alignItems: 'flex-start' }}>
                       <span className="mono" style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(90,99,230,.14)', color: 'var(--accent)', fontSize: 11, flexShrink: 0 }}>{i + 1}</span>
                       <div>
-                        <div className="mono" style={{ fontSize: 12, color: 'rgba(243,245,244,.86)', marginBottom: 3 }}>{item.label}</div>
+                        <div className="mono" style={{ fontSize: 12, color: 'rgba(243,245,244,.86)', marginBottom: 3 }}>{
+                          item.label
+                            .replace('chooseIntervention:scope_first', 'Chose: ask a few questions')
+                            .replace('chooseIntervention:resume', 'Chose: resume prior attempt')
+                            .replace('chooseIntervention:quick_start', 'Chose: quick 5-min start')
+                            .replace('chooseIntervention', 'Chose the next move')
+                            .replace('inspectBehaviorMemory', 'Checked your recent pattern')
+                            .replace('diagnoseAvoidance', 'Named the blocker')
+                            .replace('generateArtifact', 'Built a starting point')
+                            .replace('resumePriorAttempt', 'Loaded the last attempt')
+                            .replace('groundWithGoogleSearch', 'Found sources')
+                            .replace('selectIntervention', 'Picked the lowest-friction path')
+                            .replace('setCommitment', 'Locked the focus block')
+                        }</div>
                         <div style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--dim)' }}>{item.detail}</div>
                       </div>
                     </div>
@@ -425,7 +475,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                 </div>
                 {plan.toolCalls && plan.toolCalls.length > 0 && (
                   <div style={{ marginTop: 13, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.08)', fontSize: 12, color: 'var(--faint)' }}>
-                    pipeline: {plan.toolCalls.join(' -> ')}
+                    steps: {plan.toolCalls.join(' -> ')}
                   </div>
                 )}
               </div>
@@ -445,13 +495,13 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                     </div>
                   ))}
                 </div>
-                <p style={{ marginTop: 16, fontSize: 13, color: 'var(--faint)', fontStyle: 'italic' }}>You react to this — you don&apos;t start from a blank page.</p>
+                <p style={{ marginTop: 16, fontSize: 13, color: 'var(--faint)', fontStyle: 'italic' }}>You react to this â€” you don&apos;t start from a blank page.</p>
               </div>
             </div>
 
             {plan.sources && plan.sources.length > 0 && (
               <div className="glass" style={{ borderRadius: 18, padding: 16, marginBottom: 18 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>Grounded references</div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>Sources</div>
                 <div className="flex flex-col" style={{ gap: 9 }}>
                   {plan.sources.map((source, i) => (
                     <a
@@ -475,14 +525,14 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                 <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.35 }}>{plan.suggestedAction}</div>
                 <div className="inline-flex items-center gap-1.5" style={{ flexShrink: 0, padding: '7px 13px', borderRadius: 999, background: 'rgba(0,0,0,.25)', border: '1px solid rgba(90,99,230,.35)' }}>
                   <Timer size={15} style={{ color: 'var(--accent)' }} />
-                  <input type="number" min={5} max={120} value={minutes} onChange={(e) => setMinutes(Math.max(5, Math.min(120, Number(e.target.value))))} className="mono" style={{ width: 34, background: 'transparent', border: 'none', outline: 'none', color: 'var(--accent)', fontSize: 13, textAlign: 'right' }} />
+                  <input type="number" aria-label="Focus minutes" min={5} max={120} value={minutes} onChange={(e) => setMinutes(Math.max(5, Math.min(120, Number(e.target.value))))} className="mono" style={{ width: 34, background: 'transparent', border: 'none', outline: 'none', color: 'var(--accent)', fontSize: 13, textAlign: 'right' }} />
                   <span className="mono" style={{ fontSize: 13, color: 'var(--accent)' }}>min</span>
                 </div>
               </div>
             </div>
 
             <button onClick={commit} className="btn-primary flex items-center justify-center gap-2.5" style={{ width: '100%', padding: 18, borderRadius: 16, fontSize: 16 }}>
-              <Play size={17} weight="fill" /><span>Start the clock — {minutes} min</span>
+              <Play size={17} weight="fill" /><span>Start the clock â€” {minutes} min</span>
             </button>
           </div>
         )}
@@ -539,12 +589,12 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
         {/* PROOF */}
         {step === 'proof' && (
           <div style={{ animation: 'stepIn .62s cubic-bezier(.2,.65,.25,1) both', flex: 1, display: 'flex', flexDirection: 'column', paddingTop: 14 }}>
-            <span className="eyebrow" style={{ marginBottom: 10 }}>Show me</span>
-            <h2 className="serif" style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.1, marginBottom: 8 }}>Show me what you got.</h2>
-            <p style={{ fontSize: 15, color: 'var(--dim)', marginBottom: 22, maxWidth: '32ch' }}>Paste the actual work or attach a shot. I read the real thing — no credit for vibes.</p>
+            <span className="eyebrow" style={{ marginBottom: 10 }}>Show your work</span>
+            <h2 className="serif" style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.1, marginBottom: 8 }}>Show the work itself.</h2>
+            <p style={{ fontSize: 15, color: 'var(--dim)', marginBottom: 22, maxWidth: '32ch' }}>Paste the actual work or attach a screenshot. Clutch checks the evidence, not just the claim.</p>
 
             <div className="glass" style={{ borderRadius: 22, marginBottom: 14 }}>
-              <textarea value={proofText} onChange={(e) => setProofText(e.target.value)} autoFocus placeholder="Paste your paragraph, your notes, the link — whatever you actually made…" style={{ width: '100%', minHeight: 170, resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 16, lineHeight: 1.6, padding: 20 }} />
+              <textarea value={proofText} onChange={(e) => setProofText(e.target.value)} autoFocus aria-label="Proof text" placeholder="Paste what you wrote, a link, code, or drag a screenshot - show the actual work, not a summary..." style={{ width: '100%', minHeight: 170, resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 16, lineHeight: 1.6, padding: 20 }} />
             </div>
 
             {proofImage && (
@@ -558,9 +608,9 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
             <button onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2.5" style={{ padding: 14, borderRadius: 14, border: '1px dashed rgba(255,255,255,.18)', background: 'transparent', color: 'var(--dim)', fontSize: 14.5, fontWeight: 600, cursor: 'pointer', marginBottom: 18, transition: 'all .2s' }}>
               <Paperclip size={16} /><span>Attach a photo or screenshot</span>
             </button>
-            <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={handleProofImage} aria-hidden="true" />
+            <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={handleProofImage} aria-label="Attach proof screenshot" />
 
-            <button onClick={submitProof} className="btn-primary flex items-center justify-center gap-2.5" style={{ padding: 18, borderRadius: 16, fontSize: 16 }}>
+            <button onClick={submitProof} disabled={!proofText.trim() && !proofImage} className="btn-primary flex items-center justify-center gap-2.5" style={{ padding: 18, borderRadius: 16, fontSize: 16, opacity: (proofText.trim() || proofImage) ? 1 : 0.45, cursor: (proofText.trim() || proofImage) ? 'pointer' : 'not-allowed' }}>
               <Eye size={17} weight="fill" /><span>Have Clutch review it</span>
             </button>
           </div>
@@ -575,13 +625,13 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
               <Eye size={24} weight="fill" style={{ color: 'var(--accent)' }} />
             </div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Reading what you sent…</div>
+              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Reading what you sentâ€¦</div>
               <div style={{ fontSize: 14, color: 'var(--faint)' }}>I&apos;m actually looking at it, not just nodding.</div>
             </div>
           </div>
         )}
 
-        {/* DONE — reaction */}
+        {/* DONE â€” reaction */}
         {step === 'done' && (
           <div className="flex flex-col justify-center" style={{ animation: 'stepIn .55s cubic-bezier(.2,.65,.25,1) both', flex: 1 }}>
             <div className="glass" style={{ borderRadius: 24, padding: 26, border: `1px solid ${solid ? 'rgba(127,174,122,.4)' : reviewVerdict === 'partial' ? 'rgba(224,177,90,.4)' : 'rgba(255,122,122,.38)'}` }}>
@@ -608,7 +658,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
             </button>
             {!solid && (
               <button onClick={retryFromReEval} className="btn-ghost" style={{ marginTop: 10, width: '100%', padding: 13, borderRadius: 14, fontSize: 15, fontWeight: 600 }}>
-                {reEvaluation ? (reEvaluation.strategy === 'quick_start' ? 'Quick 5-min retry' : reEvaluation.strategy === 'resume' ? 'Resume — another 10 minutes' : 'Re-scope this task') : 'Give it another 10 minutes'}
+                {reEvaluation ? (reEvaluation.strategy === 'quick_start' ? 'Quick 5-min retry' : reEvaluation.strategy === 'resume' ? 'Resume â€” another 10 minutes' : 'Re-scope this task') : 'Give it another 10 minutes'}
               </button>
             )}
           </div>

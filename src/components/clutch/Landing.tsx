@@ -1,5 +1,6 @@
-'use client'
+﻿'use client'
 
+import { useState, useRef } from 'react'
 import { ArrowRight, Brain, CalendarPlus, CheckCircle, ClockCountdown, Crosshair, LinkSimple, MagnifyingGlass, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
@@ -90,8 +91,31 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
 
 function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groundedCount }: { tasks: ClutchTask[]; topTitle?: string; risk: number | null; stats: ReturnType<typeof overviewStats>; followUp?: string; focusBlock?: number; groundedCount: number }) {
   const hasData = tasks.length > 0
+  const [isHovered, setIsHovered] = useState(false)
+  const [showNotice, setShowNotice] = useState(false)
+  const [coords, setCoords] = useState({ x: 0, y: 0 })
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      setCoords({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      })
+    }
+  }
+
   return (
-    <div className="hero-dashboard-wrap" style={{ position: 'relative', zIndex: 2, perspective: 1500, transform: 'translateY(-46px)' }}>
+    <div
+      ref={containerRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onMouseMove={handleMouseMove}
+      onClick={() => setShowNotice(true)}
+      className="hero-dashboard-wrap"
+      style={{ position: 'relative', zIndex: 2, perspective: 1500, transform: 'translateY(-46px)', cursor: 'default' }}
+    >
       <div className="glass hero-dashboard" style={{ borderRadius: 18, minHeight: 650, transform: 'rotateY(-8.5deg) rotateZ(1.05deg)', transformOrigin: 'center', background: 'linear-gradient(135deg, rgba(4,9,18,.86), rgba(2,5,12,.72))', border: '1px solid rgba(150,170,210,.3)', boxShadow: '0 48px 140px -46px rgba(0,0,0,1), 0 0 90px -50px rgba(0,136,255,.7), inset 0 1px 0 rgba(255,255,255,.08)', overflow: 'hidden', display: 'grid', gridTemplateColumns: '148px minmax(0,1fr)' }}>
         <aside style={{ borderRight: '1px solid rgba(255,255,255,.08)', padding: '22px 16px', display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,.26)' }}>
           <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
@@ -100,7 +124,7 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
             </div>
             <span className="mono" style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.14em' }}>CLUTCH</span>
           </div>
-          {['Dashboard', 'My Tasks', 'Brain Dump', 'Day Plan', 'Focus Timer', 'Proof & Verdicts', 'Memory', 'Grounded'].map((item, index) => (
+          {['Dashboard', 'My Tasks', 'Brain Dump', 'Day Plan', 'Focus Timer', 'Show Your Work', 'Memory', 'Sources'].map((item, index) => (
             <div key={item} style={{ borderRadius: 8, padding: '8px 10px', background: index === 0 ? 'rgba(0,88,255,.38)' : 'transparent', color: index === 0 ? '#fff' : 'rgba(243,245,244,.62)', fontSize: 12, fontWeight: 700 }}>
               {item}
             </div>
@@ -138,9 +162,9 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
           <PreviewPanel icon={<Brain size={16} weight="fill" />} label="Gemini plan" title="Function call ready" />
-          <PreviewPanel icon={<LinkSimple size={16} weight="bold" />} label="Grounded refs" title={groundedCount ? `${groundedCount} saved sources` : 'Shown after Search grounding'} />
+          <PreviewPanel icon={<LinkSimple size={16} weight="bold" />} label="Sources" title={groundedCount ? `${groundedCount} saved sources` : 'Shown after source lookup'} />
           <PreviewPanel icon={<ClockCountdown size={16} weight="fill" />} label="Focus timer" title={focusBlock ? `${focusBlock} min calendar handoff` : 'Add block on commit'} />
-          <PreviewPanel icon={<ShieldCheck size={16} weight="fill" />} label="Proof gate" title={`${stats.accepted}/${stats.partial}/${stats.rejected} verdicts`} />
+          <PreviewPanel icon={<ShieldCheck size={16} weight="fill" />} label="Show work" title={`${stats.accepted}/${stats.partial}/${stats.rejected} verdicts`} />
         </div>
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12 }}>
@@ -151,10 +175,40 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
         </div>
         </div>
       </div>
+
+      {(isHovered || showNotice) && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            transform: `translate3d(${coords.x}px, ${coords.y - 12}px, 0) translate(-50%, -100%)`,
+            pointerEvents: 'none',
+            background: 'rgba(8, 7, 15, 0.94)',
+            border: '1.5px solid rgba(90, 99, 230, 0.6)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.8), 0 0 15px rgba(90, 99, 230, 0.25)',
+            backdropFilter: 'blur(8px)',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            color: '#fff',
+            fontSize: '11.5px',
+            fontFamily: 'var(--font-code)',
+            whiteSpace: 'nowrap',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            animation: 'stepIn .18s cubic-bezier(.22,.61,.36,1) both'
+          }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 10px rgba(90, 99, 230, 0.8)', animation: 'pulse-ring 1.5s infinite' }} />
+          <span>Interactive Preview &bull; Click <strong>Start with my tasks</strong> or <strong>See the demo flow</strong></span>
+
+        </div>
+      )}
     </div>
   )
 }
-
 function PreviewMetric({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ borderRadius: 12, background: 'rgba(0,0,0,.2)', border: '1px solid rgba(255,255,255,.07)', padding: '9px 8px' }}>

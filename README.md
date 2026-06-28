@@ -57,7 +57,7 @@ Tasks are ranked by a deterministic triage engine — intentionally *not* an age
 Risk Score = Deadline Proximity × Effort Remaining × Avoidance Signals
 ```
 
-Avoidance signals track how many times you've deferred a task or opened it and bailed.
+Avoidance signals track how many times you've deferred a task or opened it and bailed. CLUTCH also keeps deterministic **time memory** for each task: when it was added, when you last touched it, how long before or after the deadline, and whether a prior commitment has gone stale without accepted proof. Those signals show up in the dashboard, task list, memory screen, and AI context so the app can say things like "added 3d ago, last touched 8h ago, due in 5h" without inventing anything.
 - **UI:** `Dashboard` with live stats (Follow-Through %, Accepted Proofs, Off-Task Minutes, Rescued Tasks).
 
 ### 4. Autonomous Intervention Router — *The Strategist*

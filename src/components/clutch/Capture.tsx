@@ -11,7 +11,7 @@ interface Props {
   onCancel?: () => void
 }
 
-const PLACEHOLDER = 'essay due friday, call the dentist, taxes this month, reply to the landlordâ€¦'
+const PLACEHOLDER = 'essay due friday, call the dentist, taxes this month, reply to the landlord…'
 
 export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) {
   const [dump, setDump] = useState('')
@@ -68,7 +68,7 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
           >
             <div className="flex flex-col">
               <h1 className="serif" style={{ fontWeight: 400, fontSize: 'clamp(44px,5.4vw,72px)', lineHeight: 1.02, letterSpacing: '-.015em', marginBottom: 22 }}>
-                {hasExisting ? 'What else is on your mind?' : 'Whatâ€™s weighing on you?'}
+                {hasExisting ? 'What else is on your mind?' : "What's weighing on you?"}
               </h1>
               <p style={{ fontSize: 18, lineHeight: 1.6, color: 'var(--dim)', maxWidth: '32ch' }}>
                 Dump it all out in plain words. Clutch turns the mess into tasks and flags what is most likely to slip.

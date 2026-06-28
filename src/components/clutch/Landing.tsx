@@ -33,7 +33,7 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
             <span className="mono" style={{ fontWeight: 700, letterSpacing: '.14em', fontSize: 13, textTransform: 'uppercase', color: 'rgba(243,245,244,.86)' }}>Clutch</span>
           </div>
           {onLoadDemo && (
-            <button onClick={onLoadDemo} className="mono" style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.045)', color: 'var(--dim)', borderRadius: 999, padding: '9px 13px', fontSize: 12, cursor: 'pointer' }}>
+            <button onClick={onLoadDemo} className="mono" style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.045)', color: 'var(--dim)', borderRadius: 999, padding: '9px 13px', fontSize: 12, cursor: 'pointer', position: 'relative', zIndex: 20 }}>
               load demo
             </button>
           )}
@@ -114,7 +114,7 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
       onMouseMove={handleMouseMove}
       onClick={() => setShowNotice(true)}
       className="hero-dashboard-wrap"
-      style={{ position: 'relative', zIndex: 2, perspective: 1500, transform: 'translateY(-46px)', cursor: 'default' }}
+      style={{ position: 'relative', zIndex: 1, perspective: 1500, transform: 'translateY(-46px)', cursor: 'default' }}
     >
       <div className="glass hero-dashboard" style={{ borderRadius: 18, minHeight: 650, transform: 'rotateY(-8.5deg) rotateZ(1.05deg)', transformOrigin: 'center', background: 'linear-gradient(135deg, rgba(4,9,18,.86), rgba(2,5,12,.72))', border: '1px solid rgba(150,170,210,.3)', boxShadow: '0 48px 140px -46px rgba(0,0,0,1), 0 0 90px -50px rgba(0,136,255,.7), inset 0 1px 0 rgba(255,255,255,.08)', overflow: 'hidden', display: 'grid', gridTemplateColumns: '148px minmax(0,1fr)' }}>
         <aside style={{ borderRight: '1px solid rgba(255,255,255,.08)', padding: '22px 16px', display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,.26)' }}>

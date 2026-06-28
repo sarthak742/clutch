@@ -31,6 +31,8 @@ export default function Home() {
 
   const persist = (next: ClutchTask[], nextFollowThrough = followThrough) => {
     setTasks(next)
+    // Never persist demo data to localStorage
+    if (next.some((t) => t.id.startsWith('demo-'))) return
     saveClutchState(next, nextFollowThrough)
   }
 
@@ -50,8 +52,9 @@ export default function Home() {
   const handleLoadDemo = () => {
     if (tasks.length > 0 || isDemoLoaded) return
     const demo = createDemoState()
+    // Demo is in-memory only — never saved to localStorage
     setFollowThrough(demo.followThrough)
-    persist(demo.tasks, demo.followThrough)
+    setTasks(demo.tasks)
     setView('briefing')
   }
 

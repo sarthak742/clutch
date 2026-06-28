@@ -25,7 +25,7 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
   return (
     <main style={{ maxWidth: 1600, margin: '0 auto', padding: '0 clamp(20px,3.2vw,48px)', overflow: 'hidden' }}>
       <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '24px 0 28px', animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both' }}>
-        <header className="flex items-center justify-between gap-4" style={{ paddingTop: 4, paddingBottom: 18 }}>
+        <header className="flex items-center justify-between gap-4" style={{ paddingTop: 4, paddingBottom: 18, position: 'relative', zIndex: 10 }}>
           <div className="flex items-center gap-3">
             <div style={{ width: 24, height: 24, borderRadius: '50%', border: '1.5px solid rgba(90,99,230,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 14px 2px rgba(90,99,230,.6)' }} />
@@ -114,7 +114,7 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
       onMouseMove={handleMouseMove}
       onClick={() => setShowNotice(true)}
       className="hero-dashboard-wrap"
-      style={{ position: 'relative', zIndex: 2, perspective: 1500, transform: 'translateY(40px)', cursor: 'default' }}
+      style={{ position: 'relative', zIndex: 2, perspective: 1500, transform: 'translateY(-46px)', cursor: 'default' }}
     >
       <div className="glass hero-dashboard" style={{ borderRadius: 18, minHeight: 650, transform: 'rotateY(-8.5deg) rotateZ(1.05deg)', transformOrigin: 'center', background: 'linear-gradient(135deg, rgba(4,9,18,.86), rgba(2,5,12,.72))', border: '1px solid rgba(150,170,210,.3)', boxShadow: '0 48px 140px -46px rgba(0,0,0,1), 0 0 90px -50px rgba(0,136,255,.7), inset 0 1px 0 rgba(255,255,255,.08)', overflow: 'hidden', display: 'grid', gridTemplateColumns: '148px minmax(0,1fr)' }}>
         <aside style={{ borderRight: '1px solid rgba(255,255,255,.08)', padding: '22px 16px', display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,.26)' }}>
@@ -144,35 +144,35 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
           </div>
           <div className="mono" style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(243,245,244,.66)', marginBottom: 8 }}>Accountability Dashboard</div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 13 }}>
-          <PreviewMetric label="follow" value={stats.followThrough} />
-          <PreviewMetric label="proof" value={String(stats.accepted)} />
-          <PreviewMetric label="off-task" value={`${stats.offTaskMinutes}m`} />
-          <PreviewMetric label="rescued" value={String(stats.rescued)} />
-        </div>
-
-        <div style={{ borderRadius: 13, border: '1px solid rgba(224,177,90,.45)', background: 'rgba(224,177,90,.055)', padding: 15, marginBottom: 12 }}>
-          <div className="flex items-center gap-2" style={{ color: 'var(--accent)', marginBottom: 8 }}>
-            <WarningOctagon size={16} weight="fill" />
-            <span className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Most likely to blow up</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 13 }}>
+            <PreviewMetric label="follow" value={stats.followThrough} />
+            <PreviewMetric label="proof" value={String(stats.accepted)} />
+            <PreviewMetric label="off-task" value={`${stats.offTaskMinutes}m`} />
+            <PreviewMetric label="rescued" value={String(stats.rescued)} />
           </div>
-          <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.25, marginBottom: 7 }}>{topTitle ?? 'Brain-dump to generate your risk map'}</div>
-          <div style={{ color: 'var(--dim)', fontSize: 13.5, lineHeight: 1.45 }}>{hasData ? 'Ranked from deadlines, deferrals, bailouts, and commitment history.' : 'CLUTCH will rank real tasks once you add them.'}</div>
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-          <PreviewPanel icon={<Brain size={16} weight="fill" />} label="Gemini plan" title="Function call ready" />
-          <PreviewPanel icon={<LinkSimple size={16} weight="bold" />} label="Sources" title={groundedCount ? `${groundedCount} saved sources` : 'Shown after source lookup'} />
-          <PreviewPanel icon={<ClockCountdown size={16} weight="fill" />} label="Focus timer" title={focusBlock ? `${focusBlock} min calendar handoff` : 'Add block on commit'} />
-          <PreviewPanel icon={<ShieldCheck size={16} weight="fill" />} label="Show work" title={`${stats.accepted}/${stats.partial}/${stats.rejected} verdicts`} />
-        </div>
-
-        <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12 }}>
-          <div className="flex items-center gap-2.5" style={{ color: followUp ? 'var(--warn)' : 'var(--good)', fontSize: 13.5, fontWeight: 700 }}>
-            {followUp ? <CalendarPlus size={17} weight="bold" /> : <CheckCircle size={18} weight="fill" />}
-            <span>{followUp ?? 'No proof, no fake completion.'}</span>
+          <div style={{ borderRadius: 13, border: '1px solid rgba(224,177,90,.45)', background: 'rgba(224,177,90,.055)', padding: 15, marginBottom: 12 }}>
+            <div className="flex items-center gap-2" style={{ color: 'var(--accent)', marginBottom: 8 }}>
+              <WarningOctagon size={16} weight="fill" />
+              <span className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>Most likely to blow up</span>
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.25, marginBottom: 7 }}>{topTitle ?? 'Brain-dump to generate your risk map'}</div>
+            <div style={{ color: 'var(--dim)', fontSize: 13.5, lineHeight: 1.45 }}>{hasData ? 'Ranked from deadlines, deferrals, bailouts, and commitment history.' : 'CLUTCH will rank real tasks once you add them.'}</div>
           </div>
-        </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+            <PreviewPanel icon={<Brain size={16} weight="fill" />} label="Gemini plan" title="Function call ready" />
+            <PreviewPanel icon={<LinkSimple size={16} weight="bold" />} label="Sources" title={groundedCount ? `${groundedCount} saved sources` : 'Shown after source lookup'} />
+            <PreviewPanel icon={<ClockCountdown size={16} weight="fill" />} label="Focus timer" title={focusBlock ? `${focusBlock} min calendar handoff` : 'Add block on commit'} />
+            <PreviewPanel icon={<ShieldCheck size={16} weight="fill" />} label="Show work" title={`${stats.accepted}/${stats.partial}/${stats.rejected} verdicts`} />
+          </div>
+
+          <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12 }}>
+            <div className="flex items-center gap-2.5" style={{ color: followUp ? 'var(--warn)' : 'var(--good)', fontSize: 13.5, fontWeight: 700 }}>
+              {followUp ? <CalendarPlus size={17} weight="bold" /> : <CheckCircle size={18} weight="fill" />}
+              <span>{followUp ?? 'No proof, no fake completion.'}</span>
+            </div>
+          </div>
         </div>
       </div>
 

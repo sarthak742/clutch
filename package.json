@@ -8,22 +8,22 @@
     "start": "next start"
   },
   "dependencies": {
-    "@google/genai": "latest",
-    "@phosphor-icons/react": "latest",
-    "motion": "latest",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "resend": "^6.16.0"
+    "@google/genai": "2.10.0",
+    "@phosphor-icons/react": "2.1.10",
+    "motion": "12.41.0",
+    "next": "16.2.9",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "resend": "6.16.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "latest",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "eslint": "latest",
-    "eslint-config-next": "latest",
-    "tailwindcss": "latest",
-    "typescript": "latest"
+    "@tailwindcss/postcss": "4.3.1",
+    "@types/node": "26.0.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.9",
+    "tailwindcss": "4.3.1",
+    "typescript": "6.0.3"
   }
 }

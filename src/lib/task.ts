@@ -41,3 +41,17 @@ export const EFFORT_LABEL: Record<ClutchTask['effort'], string> = {
   medium: '~1 hr',
   deep: 'multi-hour',
 }
+
+export function calendarFocusBlockUrl(taskTitle: string, action: string, startMs: number, durationMin: number): string {
+  const start = new Date(startMs)
+  const end = new Date(startMs + durationMin * 60_000)
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `Focus block: ${taskTitle}`,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `CLUTCH commitment: ${action}\n\nBring back proof before marking this done.`,
+  })
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+

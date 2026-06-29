@@ -6,6 +6,7 @@ import type { ClutchTask, FollowThrough, Commitment, CommitmentOutcome } from '@
 import type { ActionPlan, InterventionDecision, QAPair, ProofReview } from '@/lib/gemini'
 import { useSpeechInput } from '@/hooks/useSpeechInput'
 import { timeMemory } from '@/lib/timeMemory'
+import { calendarFocusBlockUrl } from '@/lib/task'
 
 interface Props {
   task: ClutchTask
@@ -281,8 +282,11 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
       const canvas = document.createElement('canvas')
       canvas.width = img.width * scale
       canvas.height = img.height * scale
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-      setProofImage(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        setProofImage(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
+      }
       URL.revokeObjectURL(url)
     }
     img.src = url
@@ -394,7 +398,8 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
           <span className="mono" style={{ fontSize: 12, color: 'var(--faint)', flexShrink: 0 }}>{cur + 1} / 4</span>
         </div>
         <div style={{ fontSize: 13, color: 'var(--faint)', marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</div>
-        {/* SCOPE */}
+
+        {/* SCOPE */}
         {step === 'scope' && (
           <div style={{ animation: 'stepIn .62s cubic-bezier(.2,.65,.25,1) both', flex: 1, display: 'flex', flexDirection: 'column', paddingTop: 14 }}>
             <span className="eyebrow" style={{ marginBottom: 10 }}>Scope it</span>
@@ -577,8 +582,8 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                 <span>I&apos;m done</span><ArrowRight size={16} weight="bold" />
               </button>
             </div>
-            {focusBlockUrl && (
-              <a href={focusBlockUrl} target="_blank" rel="noreferrer" className="btn-ghost flex items-center justify-center gap-2" style={{ marginTop: 12, width: '100%', maxWidth: 340, padding: 13, borderRadius: 14, fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>
+            {focusBlockUrl && plan && (
+              <a href={calendarFocusBlockUrl(task.title, plan.suggestedAction, Date.now(), minutes)} target="_blank" rel="noreferrer" className="btn-ghost flex items-center justify-center gap-2" style={{ marginTop: 12, width: '100%', maxWidth: 340, padding: 13, borderRadius: 14, fontSize: 14.5, fontWeight: 700, textDecoration: 'none' }}>
                 <CalendarPlus size={17} weight="bold" />
                 <span>Add focus block to Calendar</span>
               </a>
@@ -613,8 +618,11 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                   const canvas = document.createElement('canvas')
                   canvas.width = img.width * scale
                   canvas.height = img.height * scale
-                  canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-                  setProofImage(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
+                  const ctx = canvas.getContext('2d')
+                  if (ctx) {
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+                    setProofImage(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
+                  }
                   URL.revokeObjectURL(url)
                 }
                 img.src = url
@@ -699,18 +707,6 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   )
 }
 
-function calendarFocusBlockUrl(taskTitle: string, action: string, startMs: number, durationMin: number): string {
-  const start = new Date(startMs)
-  const end = new Date(startMs + durationMin * 60_000)
-  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: `Focus block: ${taskTitle}`,
-    dates: `${fmt(start)}/${fmt(end)}`,
-    details: `CLUTCH commitment: ${action}\n\nBring back proof before marking this done.`,
-  })
-  return `https://calendar.google.com/calendar/render?${params.toString()}`
-}
 
 interface QuestionInputProps {
   q: string

@@ -1,7 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { guardRequest } from '@/lib/apiGuard'
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const blocked = guardRequest(req)
+  if (blocked) return blocked
   try {
     const { email, taskTitle, reason } = await req.json()
     if (!email) {

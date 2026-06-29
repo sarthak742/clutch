@@ -330,7 +330,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
         const reRes = await fetch('/api/intervene', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: reCtx }) })
         const rePayload = (await reRes.json()) as InterventionDecision | { error: string }
         if (reRes.ok && !('error' in rePayload)) setReEvaluation(rePayload)
-      } catch { /* silent â€” re-evaluation is additive */ }
+      } catch { /* silent — re-evaluation is additive */ }
     }
   }
 
@@ -367,7 +367,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const mmss = `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`
   const timerDeg = `${Math.min(360, ((totalSeconds - secondsLeft) / Math.max(1, totalSeconds)) * 360)}deg`
   const updateAnswer = (i: number, v: string) => setAnswers((a) => a.map((x, j) => (j === i ? v : x)))
-  const artifactLines = (plan?.artifact ?? '').split('\n').map((l) => l.replace(/^[\s>*\-â€¢\d.]+/, '').trim()).filter(Boolean)
+  const artifactLines = (plan?.artifact ?? '').split('\n').map((l) => l.replace(/^[\s>*\-•\d.]+/, '').trim()).filter(Boolean)
   const cur = stepIndex(step)
   const reviewVerdict = review?.verdict === 'accepted' && review.solid ? 'accepted' : review?.verdict === 'partial' ? 'partial' : 'rejected'
   const solid = reviewVerdict === 'accepted'
@@ -396,11 +396,11 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
           <div style={{ animation: 'stepIn .62s cubic-bezier(.2,.65,.25,1) both', flex: 1, display: 'flex', flexDirection: 'column', paddingTop: 14 }}>
             <span className="eyebrow" style={{ marginBottom: 10 }}>Scope it</span>
             <h2 className="serif" style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.1, marginBottom: 8 }}>First, a few questions.</h2>
-            <p style={{ fontSize: 15, color: 'var(--dim)', marginBottom: 24, maxWidth: '32ch' }}>I need the specifics to actually help â€” not generic advice. Answer these and I&apos;ll build you a real starting point.</p>
+            <p style={{ fontSize: 15, color: 'var(--dim)', marginBottom: 24, maxWidth: '32ch' }}>I need the specifics to actually help — not generic advice. Answer these and I&apos;ll build you a real starting point.</p>
             {!questions ? (
               <div className="flex items-center gap-3" style={{ minHeight: 120 }}>
                 <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 14px 3px rgba(90,99,230,.6)', animation: 'breathe 1.6s ease-in-out infinite' }} />
-                <span style={{ color: 'var(--dim)' }}>Working out what I need to knowâ€¦</span>
+                <span style={{ color: 'var(--dim)' }}>Working out what I need to know…</span>
               </div>
             ) : (
               <>
@@ -412,7 +412,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                         aria-label={`Answer question ${i + 1}: ${q}`}
                         value={answers[i] ?? ''}
                         onChange={(e) => updateAnswer(i, e.target.value)}
-                        placeholder="Type your answerâ€¦"
+                        placeholder="Type your answer…"
                         style={{ width: '100%', background: 'rgba(0,0,0,.2)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, padding: '13px 15px', color: 'var(--text)', fontSize: 15, outline: 'none', transition: 'border-color .2s' }}
                         onFocus={(e) => (e.target.style.borderColor = 'rgba(90,99,230,.5)')}
                         onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,.1)')}
@@ -429,7 +429,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                 <button onClick={act} className="btn-primary flex items-center justify-center gap-2.5" style={{ marginTop: 20, padding: 18, borderRadius: 16, fontSize: 16 }}>
                   <span>Build my move</span><ArrowRight size={18} weight="bold" />
                 </button>
-                <button onClick={act} className="mono" style={{ marginTop: 12, padding: 0, background: 'none', border: 'none', color: 'var(--faint)', fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>skip â€” just give me something</button>
+                <button onClick={act} className="mono" style={{ marginTop: 12, padding: 0, background: 'none', border: 'none', color: 'var(--faint)', fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>skip — just give me something</button>
               </>
             )}
           </div>
@@ -439,7 +439,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
         {step === 'acting' && (
           <div className="flex items-center justify-center gap-3" style={{ flex: 1, minHeight: 200 }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 18px 4px rgba(90,99,230,.7)', animation: 'breathe 1.6s ease-in-out infinite' }} />
-            <span style={{ color: 'var(--dim)' }}>Clutch is building your moveâ€¦</span>
+            <span style={{ color: 'var(--dim)' }}>Clutch is building your move…</span>
           </div>
         )}
 
@@ -498,7 +498,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
                     </div>
                   ))}
                 </div>
-                <p style={{ marginTop: 16, fontSize: 13, color: 'var(--faint)', fontStyle: 'italic' }}>You react to this â€” you don&apos;t start from a blank page.</p>
+                <p style={{ marginTop: 16, fontSize: 13, color: 'var(--faint)', fontStyle: 'italic' }}>You react to this — you don&apos;t start from a blank page.</p>
               </div>
             </div>
 
@@ -535,7 +535,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
             </div>
 
             <button onClick={commit} className="btn-primary flex items-center justify-center gap-2.5" style={{ width: '100%', padding: 18, borderRadius: 16, fontSize: 16 }}>
-              <Play size={17} weight="fill" /><span>Start the clock â€” {minutes} min</span>
+              <Play size={17} weight="fill" /><span>Start the clock — {minutes} min</span>
             </button>
           </div>
         )}
@@ -628,13 +628,13 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
               <Eye size={24} weight="fill" style={{ color: 'var(--accent)' }} />
             </div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Reading what you sentâ€¦</div>
+              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Reading what you sent…</div>
               <div style={{ fontSize: 14, color: 'var(--faint)' }}>I&apos;m actually looking at it, not just nodding.</div>
             </div>
           </div>
         )}
 
-        {/* DONE â€” reaction */}
+        {/* DONE — reaction */}
         {step === 'done' && (
           <div className="flex flex-col justify-center" style={{ animation: 'stepIn .55s cubic-bezier(.2,.65,.25,1) both', flex: 1 }}>
             <div className="glass" style={{ borderRadius: 24, padding: 26, border: `1px solid ${solid ? 'rgba(127,174,122,.4)' : reviewVerdict === 'partial' ? 'rgba(224,177,90,.4)' : 'rgba(255,122,122,.38)'}` }}>
@@ -661,7 +661,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
             </button>
             {!solid && (
               <button onClick={retryFromReEval} className="btn-ghost" style={{ marginTop: 10, width: '100%', padding: 13, borderRadius: 14, fontSize: 15, fontWeight: 600 }}>
-                {reEvaluation ? (reEvaluation.strategy === 'quick_start' ? 'Quick 5-min retry' : reEvaluation.strategy === 'resume' ? 'Resume â€” another 10 minutes' : 'Re-scope this task') : 'Give it another 10 minutes'}
+                {reEvaluation ? (reEvaluation.strategy === 'quick_start' ? 'Quick 5-min retry' : reEvaluation.strategy === 'resume' ? 'Resume — another 10 minutes' : 'Re-scope this task') : 'Give it another 10 minutes'}
               </button>
             )}
           </div>

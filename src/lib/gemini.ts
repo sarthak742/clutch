@@ -12,14 +12,14 @@ const FALLBACK_AI_TIMEOUT_MS = 45_000
 // error at call time rather than a cryptic auth failure deep in the SDK.
 function getClient() {
   // Use a project-specific name to avoid collisions with a global GOOGLE_API_KEY
-  // that may already exist in the OS/shell environment â€” Next.js will NOT let
+  // that may already exist in the OS/shell environment - Next.js will NOT let
   // .env.local override an environment variable that is already set, so a stale
   // system GOOGLE_API_KEY would otherwise shadow the value in .env.local.
   // Fall back to GOOGLE_API_KEY only if the dedicated name is absent.
   const apiKey = process.env.FOCUS_AGENT_GEMINI_KEY || process.env.GOOGLE_API_KEY
   if (!apiKey) {
     throw new Error(
-      'No Gemini API key found. Set FOCUS_AGENT_GEMINI_KEY in .env.local and restart the dev server â€” Next.js only reads env files at startup.',
+      'No Gemini API key found. Set FOCUS_AGENT_GEMINI_KEY in .env.local and restart the dev server - Next.js only reads env files at startup.',
     )
   }
   return new GoogleGenAI({ apiKey })
@@ -32,7 +32,7 @@ const TRACE_SCHEMA = {
     hypothesis: { type: 'string', description: 'Your hypothesis about the specific thing blocking them' },
     strategy: { type: 'string', description: 'The approach you\'ll take to help them move forward' },
     hint: { type: 'string', description: 'A concrete nudge that points toward the answer without giving it away. Make them think.' },
-    fullAnswer: { type: 'string', description: 'The complete, detailed answer â€” only revealed when the user asks' },
+    fullAnswer: { type: 'string', description: 'The complete, detailed answer - only revealed when the user asks' },
   },
   required: ['observing', 'hypothesis', 'strategy', 'hint', 'fullAnswer'],
   propertyOrdering: ['observing', 'hypothesis', 'strategy', 'hint', 'fullAnswer'],
@@ -138,7 +138,7 @@ function parseJSON<T>(text: string | undefined, fallback: T): T {
 export async function parseBrainDump(dump: string, todayISO: string): Promise<ParsedTask[]> {
   const fallback = { tasks: fallbackParse(dump) }
   const todayLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
-  const prompt = `Today is ${todayISO} (${todayLabel}). The user dumped everything on their mind below. Extract each distinct task or commitment. For each: a short imperative title, a deadline as an ISO date (YYYY-MM-DD) resolved relative to today, an effort tier ("quick" < 15 min, "medium" ~1 hour, "deep" multi-hour), and a category.\n\nDeadline resolution rules â€” apply in order:\n- "tonight", "today", "EOD", "end of day", "ASAP", "urgent", "right now" â†’ ${todayISO}\n- "tomorrow", "tmrw" â†’ the day after ${todayISO}\n- A specific time like "tomorrow 8am" or "Friday 2pm" â†’ resolve the date, drop the time\n- A weekday name like "Friday" or "Monday" â†’ the next occurrence of that day from today\n- "this week" or "by the weekend" â†’ the upcoming Sunday\n- "next week" â†’ 7 days from today\n- No deadline mentioned and none strongly implied â†’ null\n\nDo not invent tasks. Return JSON as {"tasks":[{"title":"...","deadlineISO":null,"effort":"quick","category":"work"}]}.\n\nBrain dump:\n"""${dump}"""`
+  const prompt = `Today is ${todayISO} (${todayLabel}). The user dumped everything on their mind below. Extract each distinct task or commitment. For each: a short imperative title, a deadline as an ISO date (YYYY-MM-DD) resolved relative to today, an effort tier ("quick" < 15 min, "medium" ~1 hour, "deep" multi-hour), and a category.\n\nDeadline resolution rules - apply in order:\n- "tonight", "today", "EOD", "end of day", "ASAP", "urgent", "right now" -> ${todayISO}\n- "tomorrow", "tmrw" -> the day after ${todayISO}\n- A specific time like "tomorrow 8am" or "Friday 2pm" -> resolve the date, drop the time\n- A weekday name like "Friday" or "Monday" -> the next occurrence of that day from today\n- "this week" or "by the weekend" -> the upcoming Sunday\n- "next week" -> 7 days from today\n- No deadline mentioned and none strongly implied -> null\n\nDo not invent tasks. Ignore sentences that are meta-context about the user (time available, self-descriptions like "I am weak on X", filler like "I need a plan") - only extract actual tasks or commitments. Return JSON as {"tasks":[{"title":"...","deadlineISO":null,"effort":"quick","category":"work"}]}.\n\nBrain dump:\n"""${dump}"""`
   let parsed: { tasks: ParsedTask[] }
   try {
     const response = await withGeminiResilience('parse brain dump', () => getClient().models.generateContent({
@@ -311,16 +311,16 @@ Return JSON with a strategy and one concise sentence explaining the behavioral r
 
 /**
  * Ask the few most useful, task-SPECIFIC questions Clutch needs before it can
- * give genuinely tailored help. This is what stops "exam tomorrow" â†’ generic plan.
+ * give genuinely tailored help. This is what stops "exam tomorrow" -> generic plan.
  */
 export async function scopeQuestions(task: TaskCtx): Promise<string[]> {
   const fallback = { questions: fallbackQuestions(task) }
-  const prompt = `You are Clutch, a sharp accountability partner about to help with a task â€” but the task as stated is too vague to help well. Ask the 2-4 MOST useful, specific questions you genuinely need answered to give tailored (not generic) help. Each question must be short and answerable in a phrase. Make them concrete to THIS task. Include one that surfaces what's making them put it off, only if useful. Do not ask more than 4. Return JSON as {"questions":["..."]}.
+  const prompt = `You are Clutch, a sharp accountability partner about to help with a task - but the task as stated is too vague to help well. Ask the 2-4 MOST useful, specific questions you genuinely need answered to give tailored (not generic) help. Each question must be short and answerable in a phrase. Make them concrete to THIS task. Include one that surfaces what's making them put it off, only if useful. Do not ask more than 4. Return JSON as {"questions":["..."]}.
 
 Task: "${task.title}"
 Signals: ${taskSignals(task)}
 
-Example â€” for "study for exam tomorrow" good questions are: "Which subject/exam?", "What topics will it cover?", "What have you covered already, and where are you weakest?", "How many hours do you have today?". Bad: "Are you ready?" (vague), "Do you want help?" (useless).`
+Example - for "study for exam tomorrow" good questions are: "Which subject/exam?", "What topics will it cover?", "What have you covered already, and where are you weakest?", "How many hours do you have today?". Bad: "Are you ready?" (vague), "Do you want help?" (useless).`
   let parsed: { questions: string[] }
   try {
     const response = await withGeminiResilience('scope questions', () => getClient().models.generateContent({
@@ -348,20 +348,20 @@ Example â€” for "study for exam tomorrow" good questions are: "Which subjec
  * answers to the scope questions so the plan is specific, not generic.
  */
 export async function generateAction(task: TaskCtx, qa: QAPair[], note?: string): Promise<ActionPlan> {
-  const context = qa.filter((p) => p.answer.trim()).map((p) => `- ${p.question} â†’ ${p.answer}`).join('\n')
+  const context = qa.filter((p) => p.answer.trim()).map((p) => `- ${p.question} -> ${p.answer}`).join('\n')
 
-  const prompt = `You are Clutch, a sharp, warm accountability partner who gets people into action â€” not a cheerleader, not a lecturer.
+  const prompt = `You are Clutch, a sharp, warm accountability partner who gets people into action - not a cheerleader, not a lecturer.
 
 Task: "${task.title}"
 Signals: ${taskSignals(task)}
 What the user told you:
 ${context || '(they did not add specifics)'}${note ? `\nExtra note: "${note}"` : ''}
 
-Use their specifics. Do NOT give generic advice â€” tailor everything to what they actually said (their subject, their weak areas, their time budget, etc.). Return:
+Use their specifics. Do NOT give generic advice - tailor everything to what they actually said (their subject, their weak areas, their time budget, etc.). Return:
 - diagnosis: 1-2 honest, specific sentences naming what's really going on, referencing their answers. No flattery.
 - suggestedAction: ONE concrete thing to do RIGHT NOW, an imperative they can commit to, sized to the time they have.
 - suggestedMinutes: a realistic time box (5-45).
-- artifact: the actual started-for-them deliverable, specific to their answers â€” e.g. a prioritized study plan for THEIR weak topics across THEIR available hours, a real draft, a worked example, or a concrete first step. Genuinely usable, plain text / markdown. Not a description of what to do â€” the thing itself.
+- artifact: the actual started-for-them deliverable, specific to their answers - e.g. a prioritized study plan for THEIR weak topics across THEIR available hours, a real draft, a worked example, or a concrete first step. Genuinely usable, plain text / markdown. Not a description of what to do - the thing itself.
 - agentTrace: 3-4 short visible audit steps showing what you observed, which local tool/intervention you chose, and why.
 - toolCalls: the deterministic pipeline steps represented in this intervention from this list: inspectBehaviorMemory, diagnoseAvoidance, selectIntervention, generateArtifact, setCommitment.
 
@@ -484,7 +484,7 @@ function extractGroundedSources(response: unknown): GroundedSource[] {
 }
 
 /**
- * React honestly to the proof the user showed against what they committed to â€”
+ * React honestly to the proof the user showed against what they committed to -
  * acknowledge real progress specifically, or push back if it's thin. The thing
  * that stops Clutch from rubber-stamping "solved a few questions".
  */
@@ -500,7 +500,7 @@ export async function reviewProof(
     parts.push({ inlineData: { mimeType: 'image/jpeg', data: proofImage } })
   }
   parts.push({
-    text: `You are Clutch, a sharp accountability partner â€” honest, not mean, not a pushover. Your job is to VERIFY the work actually got done, not to take their word for it.
+    text: `You are Clutch, a sharp accountability partner - honest, not mean, not a pushover. Your job is to VERIFY the work actually got done, not to take their word for it.
 
 Task: "${task.title}" (${taskSignals(task)})
 They committed to: "${action}"
@@ -508,10 +508,10 @@ They reported: ${status}
 ${proofImage ? 'They attached an IMAGE of their work (shown above). Examine it as evidence.' : ''}
 What they wrote as proof: "${proofText || '(nothing shown)'}"
 
-Inspect the actual evidence â€” the attached image and/or the pasted text. Judge whether it genuinely shows the committed work was done, and assess its QUALITY where you can (e.g. is the solved problem actually correct? does the draft address the prompt? is the work substantial enough given the deadline?). If they pasted real content, critique it specifically. If the evidence is missing, vague ("did some", "a few"), generic, or doesn't match the commitment, say so plainly and ask the pointed follow-up. Do not accept claims without substance.
+Inspect the actual evidence - the attached image and/or the pasted text. Judge whether it genuinely shows the committed work was done, and assess its QUALITY where you can (e.g. is the solved problem actually correct? does the draft address the prompt? is the work substantial enough given the deadline?). If they pasted real content, critique it specifically. If the evidence is missing, vague ("did some", "a few"), generic, or doesn't match the commitment, say so plainly and ask the pointed follow-up. Do not accept claims without substance.
 
 Return:
-- reaction: 1-2 sentences reacting to the actual evidence â€” acknowledge specifically if it's real and good, or call out exactly what's missing/wrong.
+- reaction: 1-2 sentences reacting to the actual evidence - acknowledge specifically if it's real and good, or call out exactly what's missing/wrong.
 - nextNudge: one concrete next step.
 - solid: true ONLY if the shown evidence genuinely demonstrates the committed work was done to a reasonable standard; false if it's missing, vague, thin, or unverified.`,
   })
@@ -846,7 +846,7 @@ export async function* streamTrace(step: string, task: string, screenshot?: stri
     parts.push({ inlineData: { mimeType: 'image/jpeg', data: screenshot } })
   }
   parts.push({
-    text: `You are a focus agent. Someone is stuck on a task step. Think carefully through why they might be stuck and how to help them. Do NOT give the full answer immediately â€” the hint should nudge thinking without solving it. Save the complete answer for fullAnswer only.\n\nOverall task: "${task}"\nStep they are stuck on: "${step}"`,
+    text: `You are a focus agent. Someone is stuck on a task step. Think carefully through why they might be stuck and how to help them. Do NOT give the full answer immediately - the hint should nudge thinking without solving it. Save the complete answer for fullAnswer only.\n\nOverall task: "${task}"\nStep they are stuck on: "${step}"`,
   })
 
   try {
@@ -925,7 +925,7 @@ export async function generateReflection(
   const elapsedMinutes = Math.round(elapsedSeconds / 60)
   const overBudget = Math.max(0, elapsedMinutes - totalMinutes)
 
-  // Focus score derived from real session data â€” never invented
+  // Focus score derived from real session data - never invented
   const completionRatio = completed / Math.max(total, 1)
   const timeRatio = Math.min(1, totalMinutes / Math.max(elapsedMinutes, 1))
   const stuckPenalty = Math.min(0.3, stuckCount * 0.05)
@@ -999,7 +999,7 @@ export async function morningBriefing(
   try {
     const response = await withGeminiResilience('morning briefing', () => getClient().models.generateContent({
       model: MODEL,
-      contents: `You are Clutch writing a proactive ${timeOfDay} briefing â€” the kind that would arrive as a push notification or email digest before the user even opens the app. Be honest, specific, and concise. No filler.
+      contents: `You are Clutch writing a proactive ${timeOfDay} briefing - the kind that would arrive as a push notification or email digest before the user even opens the app. Be honest, specific, and concise. No filler.
 
 Top risk-ranked tasks:
 ${ranked.map((r) => `- "${r.task.title}" (risk ${r.score}, reason: ${r.reason}, ${timeMemorySignals(r.task).join('; ')})`).join('\n')}
@@ -1012,7 +1012,7 @@ Follow-through rate: ${rate !== null ? `${rate}%` : 'no commitments yet'}
 Return:
 - greeting: a short, time-aware opening (1 sentence, reference the time of day)
 - topRisk: 1-2 sentences naming the single most dangerous item and why it needs attention RIGHT NOW, referencing real signals
-- nudge: 1 sentence â€” the one concrete action to start with`,
+- nudge: 1 sentence - the one concrete action to start with`,
       config: {
         responseMimeType: 'application/json',
         responseSchema: {
@@ -1074,9 +1074,9 @@ function fallbackMorningBriefing(
   return {
     greeting: active.length > 0
       ? `Good ${timeOfDay}. You have ${active.length} active task${active.length === 1 ? '' : 's'} and ${rate !== null ? `a ${rate}% follow-through rate` : 'no commitments logged yet'}.`
-      : `Good ${timeOfDay}. Nothing active â€” dump what's on your mind when something starts to feel risky.`,
+      : `Good ${timeOfDay}. Nothing active - dump what's on your mind when something starts to feel risky.`,
     topRisk: top
-      ? `"${top.task.title}" is the most likely to slip â€” ${top.reason.toLowerCase()}. ${top.task.deferralCount > 0 ? `You've walked past it ${top.task.deferralCount} time${top.task.deferralCount > 1 ? 's' : ''}.` : 'It has no progress yet.'}`
+      ? `"${top.task.title}" is the most likely to slip - ${top.reason.toLowerCase()}. ${top.task.deferralCount > 0 ? `You've walked past it ${top.task.deferralCount} time${top.task.deferralCount > 1 ? 's' : ''}.` : 'It has no progress yet.'}`
       : 'No tasks at risk right now.',
     nudge: top
       ? `Open "${top.task.title}" and produce proof before anything else.`

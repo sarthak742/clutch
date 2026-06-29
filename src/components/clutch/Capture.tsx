@@ -8,19 +8,40 @@ import { useSpeechInput } from '@/hooks/useSpeechInput'
 interface Props {
   hasExisting: boolean
   onParsed: (tasks: ParsedTask[]) => void
+  existingTitles?: string[]
   onLoadDemo?: () => void
   onCancel?: () => void
 }
 
+type SimilarMatches = Record<number, { title: string; score: number }>
+
 const PLACEHOLDER = 'essay due friday, call the dentist, taxes this month, reply to the landlord…'
 
-export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) {
+export function Capture({ hasExisting, onParsed, existingTitles = [], onLoadDemo, onCancel }: Props) {
   const [dump, setDump] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pendingReview, setPendingReview] = useState<{ parsed: ParsedTask[]; matches: SimilarMatches } | null>(null)
 
   const { isListening, error: speechError, startListening, stopListening } = useSpeechInput((text) => {
     setDump(text)
   })
+
+  // Semantic duplicate check via Gemini embeddings. Fails soft: any error just
+  // means we proceed as if there were no duplicates.
+  const checkSimilar = async (parsed: ParsedTask[]): Promise<SimilarMatches> => {
+    if (existingTitles.length === 0 || parsed.length === 0) return {}
+    try {
+      const res = await fetch('/api/similar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newTitles: parsed.map((t) => t.title), existingTitles }),
+      })
+      const { matches } = (await res.json()) as { matches: SimilarMatches }
+      return matches ?? {}
+    } catch {
+      return {}
+    }
+  }
 
   const submit = async () => {
     if (!dump.trim() || loading) return
@@ -36,12 +57,30 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
       if (!res.ok || 'error' in payload) {
         throw new Error('error' in payload ? payload.error : `Request failed (${res.status})`)
       }
+      const matches = await checkSimilar(payload.tasks)
+      if (Object.keys(matches).length > 0) {
+        setPendingReview({ parsed: payload.tasks, matches })
+        return
+      }
       onParsed(payload.tasks)
     } catch (e) {
       alert(`Could not read your brain dump.\n\n${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setLoading(false)
     }
+  }
+
+  const addAll = () => {
+    if (!pendingReview) return
+    onParsed(pendingReview.parsed)
+    setPendingReview(null)
+  }
+
+  const skipDuplicates = () => {
+    if (!pendingReview) return
+    const dupes = new Set(Object.keys(pendingReview.matches).map(Number))
+    onParsed(pendingReview.parsed.filter((_, i) => !dupes.has(i)))
+    setPendingReview(null)
   }
 
   return (
@@ -66,6 +105,34 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
                 <div key={i} className="shimmer" style={{ height: 62, borderRadius: 18, animationDelay: `${d}s` }} />
               ))}
             </div>
+          </div>
+        ) : pendingReview ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 20, padding: '48px 0', maxWidth: 600 }}>
+            <div>
+              <div className="mono" style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--warn)', marginBottom: 10 }}>Possible duplicates</div>
+              <h2 className="serif" style={{ fontWeight: 400, fontSize: 'clamp(30px,4vw,44px)', lineHeight: 1.08, marginBottom: 12 }}>Some of these look like tasks you already have</h2>
+              <p style={{ fontSize: 15.5, lineHeight: 1.6, color: 'var(--dim)' }}>CLUTCH compared your new items against your existing list semantically with Gemini embeddings — not just exact text.</p>
+            </div>
+            <div className="flex flex-col" style={{ gap: 10 }}>
+              {pendingReview.parsed.map((t, i) => {
+                const match = pendingReview.matches[i]
+                return (
+                  <div key={i} className="glass" style={{ borderRadius: 14, padding: '13px 16px', border: match ? '1px solid rgba(224,177,90,.4)' : undefined }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{t.title}</div>
+                    {match && (
+                      <div style={{ fontSize: 12.5, color: 'var(--warn)', marginTop: 5 }}>
+                        ⚠ looks similar to “{match.title}” ({Math.round(match.score * 100)}% match)
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex" style={{ gap: 10 }}>
+              <button onClick={skipDuplicates} className="btn-primary" style={{ flex: 1, padding: 14, borderRadius: 14, fontSize: 15 }}>Skip the duplicates</button>
+              <button onClick={addAll} className="btn-ghost" style={{ flex: 1, padding: 14, borderRadius: 14, fontSize: 15 }}>Add all anyway</button>
+            </div>
+            <button onClick={() => setPendingReview(null)} className="mono" style={{ fontSize: 12, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer', alignSelf: 'flex-start' }}>back to editing</button>
           </div>
         ) : (
           <div

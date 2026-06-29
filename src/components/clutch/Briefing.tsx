@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { ArrowRight, ArrowUUpLeft, BellRinging, Bell, CalendarPlus, CalendarX, ChartLineUp, ClockCounterClockwise, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, Sun, WarningOctagon, List, DotsThreeOutline, X } from '@phosphor-icons/react'
+import { useState, useEffect, useRef } from 'react'
+import { ArrowRight, ArrowUUpLeft, BellRinging, Bell, CalendarPlus, CalendarX, ChartLineUp, ClockCounterClockwise, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, Sun, WarningOctagon, List, DotsThreeOutline, X, SpeakerHigh, SpeakerSlash } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
-import { deadlineLabel, EFFORT_LABEL } from '@/lib/task'
+import { deadlineLabel, EFFORT_LABEL, calendarFocusBlockUrl } from '@/lib/task'
 import type { DayPlan, MorningBriefing } from '@/lib/gemini'
 import { computeStreak, followUpMemory, latestFocusBlock, latestGroundedSources, overviewStats } from '@/lib/overview'
 import { timeMemory } from '@/lib/timeMemory'
@@ -137,6 +137,25 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
     if (updated) {
       localStorage.setItem('clutch_notified_overdue', JSON.stringify(notified))
     }
+  }, [tasks, email])
+
+  // Push the latest snapshot server-side so the Cloud Scheduler cron can send
+  // proactive alerts even when no tab is open. No-op until an email is set;
+  // demo tasks are never uploaded. Fails soft (off-GCP the server ignores it).
+  useEffect(() => {
+    if (!email) return
+    const real = tasks.filter((t) => !t.id.startsWith('demo-'))
+    if (real.length === 0) return
+    let clientId = localStorage.getItem('clutch-client-id')
+    if (!clientId) {
+      clientId = crypto.randomUUID()
+      localStorage.setItem('clutch-client-id', clientId)
+    }
+    fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, email, tasks: real }),
+    }).catch(() => {})
   }, [tasks, email])
 
   const now = Date.now()
@@ -565,7 +584,7 @@ function FocusScreen({ focusBlock, top, onEngage }: { focusBlock: ReturnType<typ
   return (
     <div style={{ display: 'grid', gap: 12, maxWidth: 780 }}>
       {focusBlock ? (
-        <a href={focusBlock.commitment.focusBlockUrl} target="_blank" rel="noreferrer" className="glass" style={{ display: 'block', borderRadius: 22, padding: 22, color: 'inherit', textDecoration: 'none' }}>
+        <a href={calendarFocusBlockUrl(focusBlock.task.title, focusBlock.commitment.action, Date.now(), focusBlock.commitment.durationMin)} target="_blank" rel="noreferrer" className="glass" style={{ display: 'block', borderRadius: 22, padding: 22, color: 'inherit', textDecoration: 'none' }}>
           <div className="flex items-center gap-2" style={{ marginBottom: 10, color: 'var(--accent)' }}>
             <CalendarPlus size={18} weight="bold" />
             <span className="mono" style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase' }}>Focus block ready</span>
@@ -749,6 +768,59 @@ function MorningScreen({ briefing, loading, onGenerate, analytics, top, onEngage
   top: ReturnType<typeof rankTasks>[number]
   onEngage: (id: string) => void
 }) {
+  const [speaking, setSpeaking] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const stopSpeech = () => {
+    audioRef.current?.pause()
+    audioRef.current = null
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    setSpeaking(false)
+  }
+
+  // Browser SpeechSynthesis fallback — keeps the feature working even if the
+  // Gemini TTS call is unavailable, so the demo never has a dead button.
+  const browserSpeak = (text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setSpeaking(false)
+      return
+    }
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.onend = () => setSpeaking(false)
+    utterance.onerror = () => setSpeaking(false)
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const speakBriefing = async () => {
+    if (!briefing) return
+    if (speaking) {
+      stopSpeech()
+      return
+    }
+    const text = `${briefing.greeting} Top risk. ${briefing.topRisk} Start here. ${briefing.nudge}`
+    setSpeaking(true)
+    try {
+      const res = await fetch('/api/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      const { audio } = (await res.json()) as { audio: string | null }
+      if (audio) {
+        const el = new Audio(`data:audio/wav;base64,${audio}`)
+        audioRef.current = el
+        el.onended = () => setSpeaking(false)
+        el.onerror = () => browserSpeak(text)
+        await el.play()
+        return
+      }
+      browserSpeak(text)
+    } catch {
+      browserSpeak(text)
+    }
+  }
+
   return (
     <div style={{ display: 'grid', gap: 14, maxWidth: 780 }}>
       <div style={{ borderRadius: 22, padding: '22px 24px', background: 'rgba(90,99,230,.06)', border: '1px solid rgba(90,99,230,.24)' }}>
@@ -778,7 +850,18 @@ function MorningScreen({ briefing, loading, onGenerate, analytics, top, onEngage
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
                 Gemini 2.5
               </div>
-              <span style={{ fontSize: 11, color: 'var(--faint)' }}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <div className="flex items-center" style={{ gap: 10 }}>
+                <button
+                  onClick={speakBriefing}
+                  aria-label={speaking ? 'Stop' : 'Listen to briefing'}
+                  className="inline-flex items-center"
+                  style={{ gap: 6, padding: '4px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', color: 'var(--accent)', background: 'rgba(90,99,230,.12)', border: '1px solid rgba(90,99,230,.3)' }}
+                >
+                  {speaking ? <SpeakerSlash size={14} weight="bold" /> : <SpeakerHigh size={14} weight="bold" />}
+                  {speaking ? 'Stop' : 'Listen'}
+                </button>
+                <span style={{ fontSize: 11, color: 'var(--faint)' }}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
             </div>
             <div style={{ fontSize: 22, fontWeight: 850, lineHeight: 1.2, marginBottom: 14 }}>{briefing.greeting}</div>
             <div style={{ borderRadius: 16, background: 'rgba(224,177,90,.07)', border: '1px solid rgba(224,177,90,.3)', padding: 16, marginBottom: 14 }}>

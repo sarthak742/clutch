@@ -5,6 +5,10 @@ import { rankTasks } from './triage'
 import { timeMemorySignals } from './timeMemory'
 
 const MODEL = 'gemini-2.5-flash'
+// Free-tier Flash models only (no Pro). Both are overridable via env in case
+// Google renames the preview model strings.
+const TTS_MODEL = process.env.FOCUS_AGENT_TTS_MODEL || 'gemini-2.5-flash-preview-tts'
+const EMBED_MODEL = process.env.FOCUS_AGENT_EMBED_MODEL || 'text-embedding-004'
 const GEMINI_TIMEOUT_MS = 22_000
 const FALLBACK_AI_TIMEOUT_MS = 45_000
 
@@ -461,7 +465,9 @@ ${context || '(none)'}
 
       Return a concise reference note naming only the most relevant sources. Prefer official docs, university/government pages, or reputable explainers. Do not invent URLs.`,
       config: {
-        tools: [{ googleSearch: {} }],
+        // googleSearch finds fresh sources; urlContext lets Gemini read any URL
+        // the user pasted into the task/answers and ground on its actual content.
+        tools: [{ googleSearch: {} }, { urlContext: {} }],
       },
     }))
     return extractGroundedSources(response)
@@ -1160,4 +1166,116 @@ function fallbackMorningBriefing(
       { label: 'generateMorningBriefing', detail: 'Generated briefing from your current task risk profile and behavioral memory.' },
     ],
   }
+}
+
+// ── Spoken briefing — Gemini Flash text-to-speech ─────────────────
+// Returns a base64 WAV payload, or null on any failure so the client can fall
+// back to the browser's built-in SpeechSynthesis and never lose the feature.
+export async function synthesizeSpeech(text: string): Promise<{ audioBase64: string } | null> {
+  const clean = text.trim().slice(0, 1200)
+  if (!clean) return null
+  try {
+    const params = {
+      model: TTS_MODEL,
+      contents: [{ parts: [{ text: clean }] }],
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+      },
+    }
+    const response = await withGeminiResilience('speak briefing', (client) =>
+      client.models.generateContent(params as unknown as Parameters<typeof client.models.generateContent>[0]),
+    )
+    const parts = (response as { candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> } }> })
+      .candidates?.[0]?.content?.parts ?? []
+    const audioPart = parts.find((p) => p.inlineData?.data)
+    const data = audioPart?.inlineData?.data
+    if (!data) return null
+    const mime = audioPart?.inlineData?.mimeType || 'audio/L16;rate=24000'
+    return { audioBase64: pcmBase64ToWavBase64(data, mime) }
+  } catch (error) {
+    console.warn('[gemini] TTS unavailable, client will fall back to browser speech:', error)
+    return null
+  }
+}
+
+// Gemini TTS returns raw 16-bit little-endian mono PCM. Browsers can't play raw
+// PCM, so wrap it in a 44-byte WAV header server-side and hand back a playable blob.
+function pcmBase64ToWavBase64(pcmBase64: string, mime: string): string {
+  const rateMatch = /rate=(\d+)/.exec(mime)
+  const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000
+  const pcm = Buffer.from(pcmBase64, 'base64')
+  const numChannels = 1
+  const bitsPerSample = 16
+  const blockAlign = (numChannels * bitsPerSample) / 8
+  const byteRate = sampleRate * blockAlign
+  const header = Buffer.alloc(44)
+  header.write('RIFF', 0)
+  header.writeUInt32LE(36 + pcm.length, 4)
+  header.write('WAVE', 8)
+  header.write('fmt ', 12)
+  header.writeUInt32LE(16, 16)
+  header.writeUInt16LE(1, 20)
+  header.writeUInt16LE(numChannels, 22)
+  header.writeUInt32LE(sampleRate, 24)
+  header.writeUInt32LE(byteRate, 28)
+  header.writeUInt16LE(blockAlign, 32)
+  header.writeUInt16LE(bitsPerSample, 34)
+  header.write('data', 36)
+  header.writeUInt32LE(pcm.length, 40)
+  return Buffer.concat([header, pcm]).toString('base64')
+}
+
+// ── Semantic duplicate detection — Gemini text embeddings ─────────
+export async function embedTexts(texts: string[]): Promise<number[][] | null> {
+  const cleaned = texts.map((t) => t.trim()).filter(Boolean)
+  if (cleaned.length === 0) return null
+  try {
+    const response = await withGeminiResilience('embed texts', (client) =>
+      client.models.embedContent({ model: EMBED_MODEL, contents: cleaned } as unknown as Parameters<typeof client.models.embedContent>[0]),
+    )
+    const embeddings = (response as { embeddings?: Array<{ values?: number[] }> }).embeddings
+    if (!embeddings || embeddings.length === 0) return null
+    return embeddings.map((e) => e.values ?? [])
+  } catch (error) {
+    console.warn('[gemini] embeddings unavailable:', error)
+    return null
+  }
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length === 0 || a.length !== b.length) return 0
+  let dot = 0
+  let normA = 0
+  let normB = 0
+  for (let i = 0; i < a.length; i += 1) {
+    dot += a[i] * b[i]
+    normA += a[i] * a[i]
+    normB += b[i] * b[i]
+  }
+  if (normA === 0 || normB === 0) return 0
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB))
+}
+
+// For each new title, find the most semantically similar existing title above a
+// confidence threshold. Returns a map of new-title index -> match. Fails soft to {}.
+export async function findSimilarTasks(
+  newTitles: string[],
+  existingTitles: string[],
+): Promise<Record<number, { title: string; score: number }>> {
+  const matches: Record<number, { title: string; score: number }> = {}
+  if (newTitles.length === 0 || existingTitles.length === 0) return matches
+  const all = await embedTexts([...newTitles, ...existingTitles])
+  if (!all || all.length !== newTitles.length + existingTitles.length) return matches
+  const newVecs = all.slice(0, newTitles.length)
+  const existingVecs = all.slice(newTitles.length)
+  newTitles.forEach((_, i) => {
+    let best = { title: '', score: 0 }
+    existingTitles.forEach((title, j) => {
+      const score = cosineSimilarity(newVecs[i], existingVecs[j])
+      if (score > best.score) best = { title, score }
+    })
+    if (best.score >= 0.82) matches[i] = best
+  })
+  return matches
 }

@@ -109,6 +109,7 @@ export default function Home() {
               <Capture
                 hasExisting={tasks.length > 0}
                 onParsed={handleParsed}
+                existingTitles={tasks.filter((t) => !t.id.startsWith('demo-')).map((t) => t.title)}
                 onLoadDemo={() => handleLoadDemo(true)}
                 onCancel={tasks.length > 0 ? () => setView('briefing') : () => setView('landing')}
               />

@@ -507,7 +507,11 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
 
             {plan.sources && plan.sources.length > 0 && (
               <div className="glass" style={{ borderRadius: 18, padding: 16, marginBottom: 18 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 12 }}>Sources</div>
+                <div className="flex items-center" style={{ marginBottom: 12 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 800, letterSpacing: '.03em', color: 'var(--accent)', background: 'rgba(90,99,230,.12)', border: '1px solid rgba(90,99,230,.32)', borderRadius: 999, padding: '5px 11px' }}>
+                    🔍 Grounded with Google Search
+                  </span>
+                </div>
                 <div className="flex flex-col" style={{ gap: 9 }}>
                   {plan.sources.map((source, i) => (
                     <a

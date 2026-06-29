@@ -39,8 +39,13 @@ export function createDemoState(now: number = Date.now()): { tasks: ClutchTask[]
           { label: 'Hypothesis', detail: 'User knows how to deploy in principle but is stuck on secret injection — classic "almost there" paralysis.' },
           { label: 'Strategy', detail: 'Skip re-scoping. Surface the exact gcloud commands with the env var flag filled in. Reduce it to copy-paste.' },
           { label: 'Routing', detail: 'resume → artifact already exists, presenting updated step-by-step with the missing flag.' },
+          { label: 'groundWithGoogleSearch', detail: 'Fetched 3 grounded reference source(s) for this task.' },
         ],
-        groundedSources: [],
+        groundedSources: [
+          { title: 'Deploying container images to Cloud Run — Google Cloud', uri: 'https://cloud.google.com/run/docs/deploying' },
+          { title: 'Configure environment variables for services — Cloud Run', uri: 'https://cloud.google.com/run/docs/configuring/services/environment-variables' },
+          { title: 'Gemini API quickstart — Google AI for Developers', uri: 'https://ai.google.dev/gemini-api/docs/quickstart' },
+        ],
         commitments: [
           {
             id: 'demo-deploy-commit-1',

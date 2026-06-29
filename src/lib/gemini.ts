@@ -10,19 +10,31 @@ const FALLBACK_AI_TIMEOUT_MS = 45_000
 
 // Lazily construct the client so a missing key produces a clear, actionable
 // error at call time rather than a cryptic auth failure deep in the SDK.
-function getClient() {
-  // Use a project-specific name to avoid collisions with a global GOOGLE_API_KEY
-  // that may already exist in the OS/shell environment - Next.js will NOT let
-  // .env.local override an environment variable that is already set, so a stale
-  // system GOOGLE_API_KEY would otherwise shadow the value in .env.local.
-  // Fall back to GOOGLE_API_KEY only if the dedicated name is absent.
-  const apiKey = process.env.FOCUS_AGENT_GEMINI_KEY || process.env.GOOGLE_API_KEY
+// Multiple keys are rotated on 429 rate-limit errors to maximise free-tier quota.
+const GEMINI_KEYS: string[] = [
+  process.env.FOCUS_AGENT_GEMINI_KEY,
+  process.env.FOCUS_AGENT_GEMINI_KEY_2,
+  process.env.FOCUS_AGENT_GEMINI_KEY_3,
+  process.env.FOCUS_AGENT_GEMINI_KEY_4,
+  process.env.GOOGLE_API_KEY,
+].filter(Boolean) as string[]
+
+let _keyIndex = 0
+
+function getClient(keyIndex?: number): GoogleGenAI {
+  const index = keyIndex !== undefined ? keyIndex : _keyIndex
+  const apiKey = GEMINI_KEYS[index % Math.max(GEMINI_KEYS.length, 1)]
   if (!apiKey) {
     throw new Error(
       'No Gemini API key found. Set FOCUS_AGENT_GEMINI_KEY in .env.local and restart the dev server - Next.js only reads env files at startup.',
     )
   }
   return new GoogleGenAI({ apiKey })
+}
+
+function isRateLimitError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e)
+  return /429|rate.?limit|quota/i.test(msg)
 }
 
 const TRACE_SCHEMA = {
@@ -42,17 +54,28 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function withGeminiResilience<T>(label: string, call: () => Promise<T>): Promise<T> {
+async function withGeminiResilience<T>(label: string, call: (client: GoogleGenAI) => Promise<T>): Promise<T> {
   let lastError: unknown
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const totalKeys = Math.max(GEMINI_KEYS.length, 1)
+  const maxAttempts = Math.min(totalKeys * 2, 6)
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const keyIndex = _keyIndex % totalKeys
     try {
       return await Promise.race([
-        call(),
+        call(getClient(keyIndex)),
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), GEMINI_TIMEOUT_MS)),
       ])
     } catch (e) {
       lastError = e
-      if (attempt === 0) await sleep(700)
+      if (isRateLimitError(e)) {
+        // Rotate to next key on rate limit
+        _keyIndex = (_keyIndex + 1) % totalKeys
+        console.warn(`[gemini] Rate limit hit on key ${keyIndex}, rotating to key ${_keyIndex}`)
+      } else if (attempt === 0) {
+        await sleep(700)
+      } else {
+        break
+      }
     }
   }
   throw lastError instanceof Error ? lastError : new Error(`${label} failed`)
@@ -141,7 +164,7 @@ export async function parseBrainDump(dump: string, todayISO: string): Promise<Pa
   const prompt = `Today is ${todayISO} (${todayLabel}). The user dumped everything on their mind below. Extract each distinct task or commitment. For each: a short imperative title, a deadline as an ISO date (YYYY-MM-DD) resolved relative to today, an effort tier ("quick" < 15 min, "medium" ~1 hour, "deep" multi-hour), and a category.\n\nDeadline resolution rules - apply in order:\n- "tonight", "today", "EOD", "end of day", "ASAP", "urgent", "right now" -> ${todayISO}\n- "tomorrow", "tmrw" -> the day after ${todayISO}\n- A specific time like "tomorrow 8am" or "Friday 2pm" -> resolve the date, drop the time\n- A weekday name like "Friday" or "Monday" -> the next occurrence of that day from today\n- "this week" or "by the weekend" -> the upcoming Sunday\n- "next week" -> 7 days from today\n- No deadline mentioned and none strongly implied -> null\n\nDo not invent tasks. Ignore sentences that are meta-context about the user (time available, self-descriptions like "I am weak on X", filler like "I need a plan") - only extract actual tasks or commitments. Return JSON as {"tasks":[{"title":"...","deadlineISO":null,"effort":"quick","category":"work"}]}.\n\nBrain dump:\n"""${dump}"""`
   let parsed: { tasks: ParsedTask[] }
   try {
-    const response = await withGeminiResilience('parse brain dump', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('parse brain dump', (client) => client.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
@@ -271,7 +294,7 @@ Recent commitments JSON: ${JSON.stringify(recentCommitments)}
 Return JSON with a strategy and one concise sentence explaining the behavioral reason.`
 
   try {
-    const response = await withGeminiResilience('choose intervention', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('choose intervention', (client) => client.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
@@ -323,7 +346,7 @@ Signals: ${taskSignals(task)}
 Example - for "study for exam tomorrow" good questions are: "Which subject/exam?", "What topics will it cover?", "What have you covered already, and where are you weakest?", "How many hours do you have today?". Bad: "Are you ready?" (vague), "Do you want help?" (useless).`
   let parsed: { questions: string[] }
   try {
-    const response = await withGeminiResilience('scope questions', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('scope questions', (client) => client.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
@@ -370,7 +393,7 @@ Return JSON with keys diagnosis, suggestedAction, suggestedMinutes, artifact, ag
   let parsed: ActionPlan
   let fallbackProvider: string | null = null
   try {
-    const response = await withGeminiResilience('generate action', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('generate action', (client) => client.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
@@ -428,7 +451,7 @@ async function groundedSourcesForTask(task: TaskCtx, qa: QAPair[]): Promise<Grou
 
   const context = qa.filter((p) => p.answer.trim()).map((p) => `${p.question}: ${p.answer}`).join('\n')
   try {
-    const response = await withGeminiResilience('google search grounding', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('google search grounding', (client) => client.models.generateContent({
       model: MODEL,
       contents: `Use Google Search grounding to find current, credible sources that would help the user with this task.
 
@@ -523,7 +546,7 @@ Return:
   const fallback = fallbackReview(status, proofText, Boolean(proofImage))
   let parsed: Partial<ProofReview>
   try {
-    const response = await withGeminiResilience('review proof', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('review proof', (client) => client.models.generateContent({
       model: MODEL,
       contents: [{ role: 'user', parts }],
       config: {
@@ -684,7 +707,7 @@ Tasks:
 ${active.map((t) => `- ${t.id}: ${t.title}; ${taskSignals(t)}`).join('\n')}`
 
   try {
-    const first = await withGeminiResilience('plan day function call', () => getClient().models.generateContent({
+    const first = await withGeminiResilience('plan day function call', (client) => client.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
@@ -702,7 +725,7 @@ ${active.map((t) => `- ${t.id}: ${t.title}; ${taskSignals(t)}`).join('\n')}`
     if (!call || call.name !== 'prioritizeDay') return fallback
 
     const toolOutput = executePrioritizeDay(active, Number(call.args?.timeBudgetMinutes ?? 30))
-    const second = await withGeminiResilience('plan day summary', () => getClient().models.generateContent({
+    const second = await withGeminiResilience('plan day summary', (client) => client.models.generateContent({
       model: MODEL,
       contents: [
         { role: 'user', parts: [{ text: prompt }] },
@@ -801,7 +824,7 @@ export async function decomposeTask(task: string, minutes: number) {
   const fallback = fallbackSteps(task, minutes)
   const prompt = `You are a productivity coach. Break this task into 5-7 concrete, timed micro-steps that can be completed in ${minutes} minutes total. Be specific and actionable. Each step should be a real action, not a vague intention. Return JSON as {"steps":[{"text":"...","minutes":5}]}.\n\nTask: "${task}"`
   try {
-    const response = await withGeminiResilience('decompose task', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('decompose task', (client) => client.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
@@ -850,7 +873,7 @@ export async function* streamTrace(step: string, task: string, screenshot?: stri
   })
 
   try {
-    const stream = await withGeminiResilience('stream trace bootstrap', () => getClient().models.generateContentStream({
+    const stream = await withGeminiResilience('stream trace bootstrap', (client) => client.models.generateContentStream({
       model: MODEL,
       contents: [{ role: 'user', parts }],
       config: {
@@ -881,7 +904,7 @@ export async function redecomposeStep(step: string, task: string) {
   const fallback = fallbackSteps(step, 20)
   const prompt = `This step feels too large to tackle: "${step}"\n\nOverall task: "${task}"\n\nBreak it into 3-4 smaller, more approachable sub-steps that are each doable in under 10 minutes. Return JSON as {"steps":[{"text":"...","minutes":5}]}.`
   try {
-    const response = await withGeminiResilience('redecompose step', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('redecompose step', (client) => client.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
@@ -944,7 +967,7 @@ Times stuck: ${stuckCount}
 Focus score: ${focusScore}/100`
   let parsed: { summary: string; observation: string }
   try {
-    const response = await withGeminiResilience('generate reflection', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('generate reflection', (client) => client.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
@@ -997,7 +1020,7 @@ export async function morningBriefing(
   const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
   try {
-    const response = await withGeminiResilience('morning briefing', () => getClient().models.generateContent({
+    const response = await withGeminiResilience('morning briefing', (client) => client.models.generateContent({
       model: MODEL,
       contents: `You are Clutch writing a proactive ${timeOfDay} briefing - the kind that would arrive as a push notification or email digest before the user even opens the app. Be honest, specific, and concise. No filler.
 

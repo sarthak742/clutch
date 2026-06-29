@@ -71,6 +71,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
   const [running, setRunning] = useState(true)
   const [proofText, setProofText] = useState('')
   const [proofImage, setProofImage] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [review, setReview] = useState<ProofReview | null>(null)
   const [intervention, setIntervention] = useState<InterventionDecision | null>(null)
   const [reEvaluation, setReEvaluation] = useState<InterventionDecision | null>(null)
@@ -593,8 +594,38 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
             <h2 className="serif" style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.1, marginBottom: 8 }}>Show the work itself.</h2>
             <p style={{ fontSize: 15, color: 'var(--dim)', marginBottom: 22, maxWidth: '32ch' }}>Paste the actual work or attach a screenshot. Clutch checks the evidence, not just the claim.</p>
 
-            <div className="glass" style={{ borderRadius: 22, marginBottom: 14 }}>
-              <textarea value={proofText} onChange={(e) => setProofText(e.target.value)} autoFocus aria-label="Proof text" placeholder="Paste what you wrote, a link, code, or drag a screenshot - show the actual work, not a summary..." style={{ width: '100%', minHeight: 170, resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 16, lineHeight: 1.6, padding: 20 }} />
+            <div
+              className={`glass${isDragging ? ' proof-drop-active' : ''}`}
+              style={{ borderRadius: 22, marginBottom: 14, position: 'relative', transition: 'all .18s' }}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+              onDragEnter={(e) => { e.preventDefault(); setIsDragging(true) }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setIsDragging(false)
+                const file = e.dataTransfer.files?.[0]
+                if (!file || !file.type.startsWith('image/')) return
+                const img = new Image()
+                const url = URL.createObjectURL(file)
+                img.onload = () => {
+                  const MAX = 1280
+                  const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+                  const canvas = document.createElement('canvas')
+                  canvas.width = img.width * scale
+                  canvas.height = img.height * scale
+                  canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+                  setProofImage(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
+                  URL.revokeObjectURL(url)
+                }
+                img.src = url
+              }}
+            >
+              {isDragging && (
+                <div style={{ position: 'absolute', inset: 0, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--accent)' }}>Drop screenshot here</span>
+                </div>
+              )}
+              <textarea value={proofText} onChange={(e) => setProofText(e.target.value)} autoFocus aria-label="Proof text" placeholder="Paste what you wrote, a link, code, or drag a screenshot - show the actual work, not a summary..." style={{ width: '100%', minHeight: 170, resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 16, lineHeight: 1.6, padding: 20, opacity: isDragging ? 0.3 : 1 }} />
             </div>
 
             {proofImage && (

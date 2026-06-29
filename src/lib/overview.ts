@@ -78,3 +78,31 @@ export function latestGroundedSources(tasks: ClutchTask[]): { task: ClutchTask; 
     .sort((a, b) => b.lastTouched - a.lastTouched)
     .map((task) => ({ task, sources: (task.groundedSources ?? []).slice(0, 3) }))[0] ?? null
 }
+
+export function computeStreak(tasks: ClutchTask[]): number {
+  const doneTasks = tasks.filter((t) => t.status === 'done' && t.lastTouched)
+  if (doneTasks.length === 0) return 0
+
+  // Collect unique calendar days (YYYY-MM-DD) where tasks were completed
+  const daySet = new Set(
+    doneTasks.map((t) => {
+      const d = new Date(t.lastTouched)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    })
+  )
+
+  const today = new Date()
+  let streak = 0
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (daySet.has(key)) {
+      streak++
+    } else {
+      break
+    }
+  }
+  return streak
+}
+

@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowRight, ArrowUUpLeft, BellRinging, CalendarPlus, CalendarX, ChartLineUp, ClockCounterClockwise, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, WarningOctagon, List, DotsThreeOutline, X } from '@phosphor-icons/react'
+import { ArrowRight, ArrowUUpLeft, BellRinging, Bell, CalendarPlus, CalendarX, ChartLineUp, ClockCounterClockwise, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, Sun, WarningOctagon, List, DotsThreeOutline, X } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
 import { deadlineLabel, EFFORT_LABEL } from '@/lib/task'
 import type { DayPlan, MorningBriefing } from '@/lib/gemini'
-import { followUpMemory, latestFocusBlock, latestGroundedSources, overviewStats } from '@/lib/overview'
+import { computeStreak, followUpMemory, latestFocusBlock, latestGroundedSources, overviewStats } from '@/lib/overview'
 import { timeMemory } from '@/lib/timeMemory'
 
 interface Props {
@@ -52,12 +52,33 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
   const [screen, setScreen] = useState<Screen>('dashboard')
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [email, setEmail] = useState('')
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [pushEnabled, setPushEnabled] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setEmail(localStorage.getItem('clutch_user_email') || '')
+      const saved = localStorage.getItem('clutch_theme') as 'dark' | 'light' | null
+      if (saved) setTheme(saved)
+      setPushEnabled(Notification?.permission === 'granted')
     }
   }, [])
+
+  const toggleTheme = () => {
+    const next: 'dark' | 'light' = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    localStorage.setItem('clutch_theme', next)
+    document.documentElement.setAttribute('data-theme', next)
+  }
+
+  const requestPush = async () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return
+    const perm = await Notification.requestPermission()
+    if (perm === 'granted') {
+      setPushEnabled(true)
+      localStorage.setItem('clutch_push_enabled', '1')
+    }
+  }
 
   const handleEmailChange = (val: string) => {
     setEmail(val)
@@ -123,6 +144,7 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
   const top = ranked[0]
   const rest = ranked.slice(1)
   const analytics = overviewStats(tasks, followThrough)
+  const streak = computeStreak(tasks)
   const followUp = followUpMemory(tasks, now)
   const focusBlock = latestFocusBlock(tasks)
   const grounded = latestGroundedSources(tasks)
@@ -195,6 +217,9 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
                 load demo
               </button>
             )}
+            <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 8, transition: 'color .2s' }}>
+              {theme === 'dark' ? <Sun size={16} weight="bold" /> : <MoonStars size={16} weight="duotone" />}
+            </button>
             {rate !== null && (
               <span className="mono" style={{ fontSize: 12, color: 'var(--faint)' }}>
                 follow-through <span style={{ color: rate >= 60 ? 'var(--good)' : 'var(--warn)' }}>{rate}%</span>
@@ -249,6 +274,16 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
                    style={{ width: '100%', background: 'rgba(0,0,0,.25)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '6px 9px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
                  />
                  {email && <div style={{ fontSize: 9, color: 'var(--good)', marginTop: 4, opacity: 0.85 }}>Alerts enabled</div>}
+                 <div style={{ marginTop: 12 }}>
+                   <button
+                     onClick={requestPush}
+                     disabled={pushEnabled}
+                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px', borderRadius: 8, border: `1px solid ${pushEnabled ? 'rgba(127,174,122,.35)' : 'rgba(255,255,255,.12)'}`, background: pushEnabled ? 'rgba(127,174,122,.08)' : 'rgba(0,0,0,.2)', color: pushEnabled ? 'var(--good)' : 'var(--dim)', fontSize: 11, cursor: pushEnabled ? 'default' : 'pointer', fontWeight: 600, transition: 'all .2s' }}
+                   >
+                     <Bell size={12} weight={pushEnabled ? 'fill' : 'regular'} />
+                     {pushEnabled ? 'Push alerts on' : 'Enable push alerts'}
+                   </button>
+                 </div>
                </div>
              </aside>
 
@@ -264,6 +299,7 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
               {screen === 'dashboard' && (
                 <DashboardScreen
                   analytics={analytics}
+                  streak={streak}
                   followUp={followUp}
                   focusBlock={focusBlock}
                   grounded={grounded}
@@ -378,8 +414,9 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
   )
 }
 
-function DashboardScreen({ analytics, followUp, focusBlock, grounded, top, rest, now, onEngage, onDefer, onScreen }: {
+function DashboardScreen({ analytics, streak, followUp, focusBlock, grounded, top, rest, now, onEngage, onDefer, onScreen }: {
   analytics: ReturnType<typeof overviewStats>
+  streak: number
   followUp: ReturnType<typeof followUpMemory>
   focusBlock: ReturnType<typeof latestFocusBlock>
   grounded: ReturnType<typeof latestGroundedSources>
@@ -396,11 +433,12 @@ function DashboardScreen({ analytics, followUp, focusBlock, grounded, top, rest,
         <ChartLineUp size={16} weight="fill" style={{ color: 'var(--accent)' }} />
         <span className="mono" style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(243,245,244,.66)' }}>Accountability dashboard</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))', gap: 12, marginBottom: 16 }}>
         <Metric label="follow-through" value={analytics.followThrough} tone={analytics.followThroughRaw >= 60 ? 'var(--good)' : 'var(--warn)'} />
         <Metric label="accepted proof" value={String(analytics.accepted)} tone="var(--good)" />
         <Metric label="off-task time" value={`${analytics.offTaskMinutes}m`} tone={analytics.offTaskMinutes > 0 ? 'var(--warn)' : 'var(--faint)'} />
         <Metric label="rescued" value={String(analytics.rescued)} tone="var(--accent)" />
+        <Metric label={streak > 0 ? `🔥 streak` : 'streak'} value={streak > 0 ? `${streak}d` : '—'} tone={streak >= 3 ? 'var(--warn)' : streak > 0 ? 'var(--good)' : 'var(--faint)'} />
       </div>
 
       <div className="clutch-dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.08fr) minmax(320px,.92fr)', gap: 16, alignItems: 'start' }}>

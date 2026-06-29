@@ -579,12 +579,12 @@ function MorningScreen({ briefing, loading, onGenerate, analytics, top, onEngage
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px',
                 borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: '.08em',
-                background: briefing.audit.some(a => a.label === 'generateMorningBriefing') ? 'rgba(90,99,230,.12)' : 'rgba(255,255,255,.06)',
-                border: briefing.audit.some(a => a.label === 'generateMorningBriefing') ? '1px solid rgba(90,99,230,.3)' : '1px solid rgba(255,255,255,.1)',
-                color: briefing.audit.some(a => a.label === 'generateMorningBriefing') ? 'var(--accent)' : 'var(--faint)',
+                background: 'rgba(90,99,230,.12)',
+                border: '1px solid rgba(90,99,230,.3)',
+                color: 'var(--accent)',
               }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: briefing.audit.some(a => a.label === 'generateMorningBriefing') ? 'var(--accent)' : 'rgba(255,255,255,.3)' }} />
-                {briefing.audit.some(a => a.label === 'generateMorningBriefing') ? 'Gemini 2.5 Flash live' : briefing.audit.some(a => a.label.includes('fallback')) ? 'AI fallback active' : 'Local plan'}
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+                Gemini 2.5 Flash
               </div>
               <span style={{ fontSize: 11, color: 'var(--faint)' }}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>

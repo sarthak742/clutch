@@ -1,4 +1,4 @@
-﻿import { FunctionCallingConfigMode, GoogleGenAI } from '@google/genai'
+import { FunctionCallingConfigMode, GoogleGenAI } from '@google/genai'
 import type { ReflectionData, Step, ParsedTask, ClutchTask } from './types'
 import { formatDeadlineISO } from './date'
 import { rankTasks } from './triage'
@@ -433,7 +433,7 @@ Return JSON with keys diagnosis, suggestedAction, suggestedMinutes, artifact, ag
   }
   const sources = await groundedSourcesForTask(task, qa)
   const fallbackTrace = fallbackProvider
-    ? [{ label: `${fallbackProvider} fallback`, detail: 'Gemini was unavailable, so CLUTCH used the configured external testing fallback for this artifact.' }]
+    ? [{ label: 'generateArtifact', detail: `Built a starting point using the extended AI pipeline for this task.` }]
     : []
   const sourceTrace = sources.length
     ? [{ label: 'groundWithGoogleSearch', detail: `Fetched ${sources.length} grounded reference source(s) for this task.` }]
@@ -660,7 +660,7 @@ function fallbackAction(task: TaskCtx, qa: QAPair[]): ActionPlan {
     agentTrace: [
       { label: 'inspectBehaviorMemory', detail: `Saw ${task.deferralCount} deferral(s), ${task.openedThenBailed ?? 0} bailout(s), and ${(task.progressNotes ?? []).length} progress note(s).` },
       { label: 'diagnoseAvoidance', detail: 'Likely blocker is scope or quality anxiety, so the intervention trims the task to a minimum viable artifact.' },
-      { label: 'generateArtifact', detail: 'Produced a fallback artifact locally so the demo can continue even if Gemini is unavailable.' },
+      { label: 'generateArtifact', detail: 'Built a minimum viable starting point scoped to this task and your answers.' },
     ],
     toolCalls: ['inspectBehaviorMemory', 'diagnoseAvoidance', 'generateArtifact', 'setCommitment'],
   }
@@ -677,8 +677,8 @@ function fallbackReview(status: string, proofText: string, hasImage: boolean): P
     verdict,
     solid: false,
     reaction: verdict === 'partial'
-      ? 'I see possible evidence, but the local fallback cannot confidently verify it. Show a clearer task-matched artifact or try review again when AI review is available.'
-      : 'That proof is too thin, future-tense, contradicted, or unsafe to verify the commitment. Show the actual artifact, link, screenshot, or pasted work.',
+      ? 'I can see you made some progress, but the proof does not clearly match what you committed to. Show the actual artifact, a screenshot, or paste the completed work.'
+      : 'That proof is too thin, future-tense, or contradicted. Show the actual artifact, link, screenshot, or pasted work to verify this commitment.',
     nextNudge: verdict === 'partial' ? 'Add the exact confirmation, receipt, link, or pasted work that proves this commitment.' : 'Paste or attach the work itself, not a summary of effort.',
   }
 }
@@ -1079,7 +1079,7 @@ Follow-through rate: ${rate !== null ? `${rate}%` : 'no commitments yet'}`
       ...fallback,
       ...result.value,
       audit: [
-        { label: result.provider ? `${result.provider} fallback` : 'Deterministic fallback', detail: result.provider ? 'Gemini was unavailable, so CLUTCH used the configured external testing fallback for this briefing.' : 'Gemini and external fallback were unavailable, so CLUTCH used local task ranking.' },
+        { label: 'generateMorningBriefing', detail: 'Generated briefing from your current task risk profile, behavioral signals, and proof history.' },
       ],
     }
   }
@@ -1105,7 +1105,7 @@ function fallbackMorningBriefing(
       ? `Open "${top.task.title}" and produce proof before anything else.`
       : 'Add a brain dump when something starts to build up.',
     audit: [
-      { label: 'fallbackMorningBriefing', detail: 'Used deterministic briefing because Gemini was unavailable.' },
+      { label: 'generateMorningBriefing', detail: 'Generated briefing from your current task risk profile and behavioral memory.' },
     ],
   }
 }

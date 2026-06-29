@@ -42,10 +42,17 @@ export default function Home() {
   }
 
   const handleParsed = (parsed: ParsedTask[]) => {
-    const next = [...tasks, ...parsed.map(fromParsed)]
+    // If demo tasks are active, replace them with the real parsed tasks instead of mixing
+    const nonDemoTasks = tasks.filter((t) => !t.id.startsWith('demo-'))
+    const next = [...nonDemoTasks, ...parsed.map(fromParsed)]
     persist(next)
+    if (isDemoLoaded) {
+      // Also reset follow-through so demo stats don't bleed into real session
+      setFollowThrough({ committed: 0, completed: 0 })
+    }
     setView('briefing')
   }
+
 
   const isDemoLoaded = tasks.some((t) => t.id.startsWith('demo-'))
 

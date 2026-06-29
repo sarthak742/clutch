@@ -287,6 +287,15 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
   [style*="pulse-ring"], .shimmer, .mesh-path, .mesh-node, .hero-trail, .hero-node { animation: none !important; }
 }
 
+@media (max-width: 1100px) {
+  .hero-section-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .hero-dashboard-wrap {
+    display: none !important;
+  }
+}
+
 @media (max-width: 860px) {
   main section[style*="grid-template-columns"] {
     grid-template-columns: 1fr !important;

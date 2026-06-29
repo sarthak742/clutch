@@ -39,7 +39,7 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
           )}
         </header>
 
-        <section style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(500px,.82fr) minmax(650px,1.08fr)', gap: 'clamp(74px,6vw,112px)', alignItems: 'center', padding: '10px 0 14px' }}>
+        <section className="hero-section-grid" style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(500px,.82fr) minmax(650px,1.08fr)', gap: 'clamp(74px,6vw,112px)', alignItems: 'center', padding: '10px 0 14px' }}>
           <HeroMesh />
           <div style={{ position: 'relative', zIndex: 2, paddingTop: 10, transform: 'translateY(-36px)' }}>
             <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>AI accountability companion</span>

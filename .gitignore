@@ -40,3 +40,11 @@ public/mesh-preview.html
 CLUTCH_SPEC.md
 skills-lock.json
 SUBMISSION.md
+
+# Python virtual environments and scratch scripts
+judge_env/
+*_env/
+*.py
+clutch_judge_report.txt
+__pycache__/
+*.pyc

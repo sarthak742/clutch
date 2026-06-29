@@ -7,7 +7,7 @@ The accountability companion that comes through when it matters. CLUTCH triages 
 **▶ Live app:** https://clutch-529610052804.us-central1.run.app/
 
 > **Vibe2Ship Hackathon Submission** · **Problem Statement 1: The Last-Minute Life Saver**
-> Live on Google Cloud Run · Core model: Gemini 2.5 Flash via `@google/genai`
+> Live on Google Cloud Run · Core model: Gemini 2.5 via `@google/genai`
 
 ---
 
@@ -44,7 +44,7 @@ Each reasoning feature is driven by a named agent (see [The Agents](#the-agents)
 
 ### 1. Proactive Morning Briefing — *The Briefer*
 A time-aware morning digest. Before you look at your tasks, **The Briefer** analyzes your active workload, outstanding proofs, and historical follow-through rate to write a candid greeting, highlight your single highest-risk item, and deliver a concrete starting nudge.
-- **Google Tech:** Gemini 2.5 Flash text generation. · **UI:** `Morning Briefing` tab.
+- **Google Tech:** Gemini 2.5 text generation. · **UI:** `Morning Briefing` tab.
 
 ### 2. Messy Brain-Dump Parser — *The Scribe*
 Write your mind in plain language (*"submit the slides by tomorrow night, also call the dentist, finish the cloud run deployment before 2pm"*). **The Scribe** structures the stream into distinct tasks with inferred deadlines, category tags, and effort estimates.
@@ -86,6 +86,18 @@ To complete a commitment you must submit evidence — paste text, drop a link, o
 If a proof is `partial` or `rejected`, **The Closer** doesn't drop you. It re-evaluates your updated state and behavioral signals and decides the next recovery move — a quick 5-minute retry, resuming the current artifact, or routing back to re-scoping to surface the blocker.
 - **Google Tech:** Agentic re-evaluation loop.
 
+### 9. Voice Dictation — *Web Speech API*
+Hands-free input for brain dumps and scoping questions. Toggle the microphone button to dictate naturally.
+- **Web Tech:** Native HTML5 Web Speech API (`SpeechRecognition`).
+
+### 10. Progressive Web App (PWA)
+Fully installable on Android, iOS, and Desktop. Offline cache shell with instant load and custom app mesh icon.
+- **Web Tech:** Service worker caching, web manifest.
+
+### 11. Proactive Email Alerts — *Resend Integration*
+Sends immediate HTML alerts to the user's registered inbox when a deadline is missed or a focus timer expires without accepted proof.
+- **Email Tech:** Resend SDK with background timer evaluation and localStorage anti-spam logic.
+
 ---
 
 ## The Agents
@@ -94,7 +106,7 @@ CLUTCH's reasoning is handled by six named agents on top of a deterministic spin
 
 | Agent | Role | Powered by |
 |-------|------|------------|
-| **The Briefer** | Writes your candid, time-aware morning briefing and flags your single highest-risk item | Gemini 2.5 Flash (text) |
+| **The Briefer** | Writes your candid, time-aware morning briefing and flags your single highest-risk item | Gemini 2.5 (text) |
 | **The Scribe** | Turns a messy brain-dump into structured tasks with deadlines, tags, and effort | Gemini structured JSON (`responseSchema`) |
 | **The Strategist** | Reads behavioral history and chooses how you start: scope, resume, or quick-start | Gemini decision routing + behavioral memory; function calling |
 | **The Coach** | Builds your concrete starting artifact and attaches real sources when the task needs them | Gemini + Google Search Grounding |
@@ -171,8 +183,8 @@ Other scripts: `npm run build` (production build) · `npm run start` (serve the 
 - **Icons:** Phosphor Icons
 
 **Google stack**
-- **SDK:** `@google/genai` (`gemini-2.5-flash`)
-- **APIs:** Google Calendar template API, Google Search Grounding
+- **SDK:** `@google/genai` (`gemini-2.5-flash` under the hood)
+- **APIs:** Google Calendar template API, Google Search Grounding, Resend API
 - **Deployment:** Google Cloud Run (multi-stage Docker build)
 
 **Credits**

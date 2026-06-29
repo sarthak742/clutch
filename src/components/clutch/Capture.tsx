@@ -1,8 +1,9 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
-import { ArrowRight } from '@phosphor-icons/react'
+import { ArrowRight, Microphone, MicrophoneSlash } from '@phosphor-icons/react'
 import type { ParsedTask } from '@/lib/types'
+import { useSpeechInput } from '@/hooks/useSpeechInput'
 
 interface Props {
   hasExisting: boolean
@@ -16,6 +17,10 @@ const PLACEHOLDER = 'essay due friday, call the dentist, taxes this month, reply
 export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) {
   const [dump, setDump] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const { isListening, error: speechError, startListening, stopListening } = useSpeechInput((text) => {
+    setDump(text)
+  })
 
   const submit = async () => {
     if (!dump.trim() || loading) return
@@ -76,7 +81,7 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
             </div>
 
             <div className="flex flex-col" style={{ gap: 18 }}>
-              <div className="glass" style={{ borderRadius: 24 }}>
+              <div className="glass" style={{ borderRadius: 24, position: 'relative' }}>
                 <textarea
                   aria-label="Brain dump task list"
                   value={dump}
@@ -84,8 +89,31 @@ export function Capture({ hasExisting, onParsed, onLoadDemo, onCancel }: Props) 
                   placeholder={PLACEHOLDER}
                   autoFocus
                   onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit() }}
-                  style={{ width: '100%', minHeight: 232, resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 17, lineHeight: 1.65, padding: 24 }}
+                  style={{ width: '100%', minHeight: 232, resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 17, lineHeight: 1.65, padding: '24px 24px 64px' }}
                 />
+                <div style={{ position: 'absolute', bottom: 16, right: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {speechError && (
+                    <span style={{ fontSize: 11, color: 'var(--error)' }}>{speechError}</span>
+                  )}
+                  <button
+                    onClick={isListening ? stopListening : startListening}
+                    className="flex items-center justify-center"
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: '50%',
+                      background: isListening ? 'rgba(255,90,90,0.2)' : 'rgba(255,255,255,0.06)',
+                      border: isListening ? '1px solid rgba(255,90,90,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                      color: isListening ? '#ff6b6b' : 'var(--dim)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      animation: isListening ? 'breathe 1.5s infinite' : 'none'
+                    }}
+                    title={isListening ? 'Stop listening' : 'Start voice dictation'}
+                  >
+                    {isListening ? <MicrophoneSlash size={18} weight="bold" /> : <Microphone size={18} weight="bold" />}
+                  </button>
+                </div>
               </div>
 
               <button

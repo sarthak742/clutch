@@ -56,8 +56,8 @@ export default function Home() {
 
   const isDemoLoaded = tasks.some((t) => t.id.startsWith('demo-'))
 
-  const handleLoadDemo = () => {
-    if (tasks.length > 0 || isDemoLoaded) return
+  const handleLoadDemo = (force = false) => {
+    if (!force && (tasks.length > 0 || isDemoLoaded)) return
     const demo = createDemoState()
     // Demo is in-memory only — never saved to localStorage
     setFollowThrough(demo.followThrough)
@@ -99,7 +99,7 @@ export default function Home() {
                 followThrough={followThrough}
                 onStart={() => setView(tasks.length > 0 ? 'briefing' : 'capture')}
                 onAddMore={tasks.length > 0 ? () => setView('capture') : undefined}
-                onLoadDemo={tasks.length === 0 && !isDemoLoaded ? handleLoadDemo : undefined}
+                onLoadDemo={() => handleLoadDemo(true)}
               />
             </motion.div>
           )}
@@ -109,7 +109,7 @@ export default function Home() {
               <Capture
                 hasExisting={tasks.length > 0}
                 onParsed={handleParsed}
-                onLoadDemo={tasks.length === 0 && !isDemoLoaded ? handleLoadDemo : undefined}
+                onLoadDemo={() => handleLoadDemo(true)}
                 onCancel={tasks.length > 0 ? () => setView('briefing') : () => setView('landing')}
               />
             </motion.div>
@@ -123,6 +123,7 @@ export default function Home() {
                 onEngage={handleEngage}
                 onDefer={handleDefer}
                 onAddMore={() => setView('capture')}
+                onLoadDemo={() => handleLoadDemo(true)}
               />
             </motion.div>
           )}

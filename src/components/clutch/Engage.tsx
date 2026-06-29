@@ -1,9 +1,10 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { ArrowLeft, ArrowRight, MagicWand, Timer, Play, Pause, Paperclip, Image as ImageIcon, CheckCircle, Eye, Warning, CalendarPlus } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, MagicWand, Timer, Play, Pause, Paperclip, Image as ImageIcon, CheckCircle, Eye, Warning, CalendarPlus, Microphone, MicrophoneSlash } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough, Commitment, CommitmentOutcome } from '@/lib/types'
 import type { ActionPlan, InterventionDecision, QAPair, ProofReview } from '@/lib/gemini'
+import { useSpeechInput } from '@/hooks/useSpeechInput'
 import { timeMemory } from '@/lib/timeMemory'
 
 interface Props {
@@ -17,7 +18,9 @@ interface Props {
 type Step = 'scope' | 'acting' | 'plan' | 'work' | 'proof' | 'reviewing' | 'done'
 const FALLBACK_Q = ['What specifically does this involve?', 'How much time do you have right now?']
 const MAIN: Step[] = ['scope', 'plan', 'work', 'proof']
+
 const stepIndex = (s: Step) => (s === 'acting' ? 0 : s === 'reviewing' || s === 'done' ? 3 : MAIN.indexOf(s))
+
 
 function withRouterTrace(plan: ActionPlan, decision: InterventionDecision | null): ActionPlan {
   if (!decision) return plan
@@ -390,8 +393,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
           <span className="mono" style={{ fontSize: 12, color: 'var(--faint)', flexShrink: 0 }}>{cur + 1} / 4</span>
         </div>
         <div style={{ fontSize: 13, color: 'var(--faint)', marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</div>
-
-        {/* SCOPE */}
+        {/* SCOPE */}
         {step === 'scope' && (
           <div style={{ animation: 'stepIn .62s cubic-bezier(.2,.65,.25,1) both', flex: 1, display: 'flex', flexDirection: 'column', paddingTop: 14 }}>
             <span className="eyebrow" style={{ marginBottom: 10 }}>Scope it</span>
@@ -406,18 +408,13 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
               <>
                 <div className="flex flex-col" style={{ gap: 14, flex: 1 }}>
                   {questions.map((q, i) => (
-                    <div key={i} className="glass" style={{ borderRadius: 20, padding: 18 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 14, lineHeight: 1.3 }}>{q}</div>
-                      <input
-                        aria-label={`Answer question ${i + 1}: ${q}`}
-                        value={answers[i] ?? ''}
-                        onChange={(e) => updateAnswer(i, e.target.value)}
-                        placeholder="Type your answer…"
-                        style={{ width: '100%', background: 'rgba(0,0,0,.2)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, padding: '13px 15px', color: 'var(--text)', fontSize: 15, outline: 'none', transition: 'border-color .2s' }}
-                        onFocus={(e) => (e.target.style.borderColor = 'rgba(90,99,230,.5)')}
-                        onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,.1)')}
-                      />
-                    </div>
+                    <QuestionInput
+                      key={i}
+                      q={q}
+                      index={i}
+                      value={answers[i] ?? ''}
+                      onChange={(val) => updateAnswer(i, val)}
+                    />
                   ))}
                 </div>
                 {actionError && (
@@ -682,4 +679,57 @@ function calendarFocusBlockUrl(taskTitle: string, action: string, startMs: numbe
     details: `CLUTCH commitment: ${action}\n\nBring back proof before marking this done.`,
   })
   return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
+interface QuestionInputProps {
+  q: string
+  index: number
+  value: string
+  onChange: (val: string) => void
+}
+
+function QuestionInput({ q, index, value, onChange }: QuestionInputProps) {
+  const { isListening, error: speechError, startListening, stopListening } = useSpeechInput((text) => {
+    onChange(text)
+  })
+
+  return (
+    <div className="glass" style={{ borderRadius: 20, padding: 18, position: 'relative' }}>
+      <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 14, lineHeight: 1.3 }}>{q}</div>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <input
+          aria-label={`Answer question ${index + 1}: ${q}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Type or speak your answer…"
+          style={{ width: '100%', background: 'rgba(0,0,0,.2)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, padding: '13px 48px 13px 15px', color: 'var(--text)', fontSize: 15, outline: 'none', transition: 'border-color .2s' }}
+          onFocus={(e) => (e.target.style.borderColor = 'rgba(90,99,230,.5)')}
+          onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,.1)')}
+        />
+        <button
+          onClick={isListening ? stopListening : startListening}
+          className="flex items-center justify-center"
+          style={{
+            position: 'absolute',
+            right: 12,
+            width: 30,
+            height: 30,
+            borderRadius: '50%',
+            background: isListening ? 'rgba(255,90,90,0.2)' : 'transparent',
+            border: 'none',
+            color: isListening ? '#ff6b6b' : 'var(--faint)',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            animation: isListening ? 'breathe 1.5s infinite' : 'none'
+          }}
+          title={isListening ? 'Stop listening' : 'Speak answer'}
+        >
+          {isListening ? <MicrophoneSlash size={16} weight="bold" /> : <Microphone size={16} weight="bold" />}
+        </button>
+      </div>
+      {speechError && (
+        <div style={{ fontSize: 11, color: 'var(--error)', marginTop: 6, paddingLeft: 4 }}>{speechError}</div>
+      )}
+    </div>
+  )
 }

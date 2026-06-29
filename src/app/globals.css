@@ -313,6 +313,7 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
   }
   .clutch-app-shell {
     grid-template-columns: 1fr !important;
+    padding-bottom: 72px !important;
   }
   .clutch-app-sidebar {
     display: none !important;
@@ -332,5 +333,84 @@ input, textarea, button, select { font-family: inherit; font-size: inherit; }
     opacity: 0.22;
     mask-image: linear-gradient(90deg, transparent 0%, #000 24%, #000 62%, transparent 100%);
     -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 24%, #000 62%, transparent 100%);
+  }
+  .clutch-mobile-nav {
+    display: flex !important;
+  }
+}
+
+/* ── Mobile: 480px and below ── */
+@media (max-width: 480px) {
+  /* Landing hero section — override inline grid that enforces minmax(500px,...) */
+  .hero-section-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 32px !important;
+  }
+
+  /* Hero title sizing for small screens */
+  .clutch-hero-title {
+    font-size: clamp(64px, 18vw, 86px) !important;
+  }
+
+  /* Hero feature row: 2 cols on mobile */
+  .hero-feature-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Briefing app shell — sidebar hidden, main fills width */
+  .clutch-app-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: unset !important;
+    border-radius: 16px !important;
+  }
+
+  .clutch-app-sidebar {
+    display: none !important;
+  }
+
+  /* Dashboard inner grid (4-col metrics, 2-col content) */
+  .clutch-dashboard-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: unset !important;
+  }
+
+  /* Proof screen 3-col metric row */
+  .clutch-proof-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  /* Capture brain dump grid */
+  .clutch-capture-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: unset !important;
+    gap: 32px !important;
+  }
+
+  /* Engage scope question inputs */
+  .clutch-scope-input {
+    font-size: 16px !important; /* prevent iOS zoom */
+  }
+
+  /* Timer circle sizing */
+  .clutch-timer-circle {
+    width: 220px !important;
+    height: 220px !important;
+  }
+
+  /* Buttons full width on small screens */
+  .clutch-btn-row {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+
+  /* Metric grid: 2x2 on mobile instead of 4x1 */
+  .clutch-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }

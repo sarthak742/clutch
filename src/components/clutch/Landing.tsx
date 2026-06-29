@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef } from 'react'
 import { ArrowRight, Brain, CalendarPlus, CheckCircle, ClockCountdown, Crosshair, LinkSimple, MagnifyingGlass, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
@@ -22,6 +22,14 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
   const focusBlock = latestFocusBlock(tasks)
   const grounded = latestGroundedSources(tasks)
 
+  const handleDemoClick = () => {
+    if (tasks.length > 0) {
+      const ok = window.confirm('This will replace your current tasks with the demo. Continue?')
+      if (!ok) return
+    }
+    onLoadDemo?.()
+  }
+
   return (
     <main style={{ maxWidth: 1600, margin: '0 auto', padding: '0 clamp(20px,3.2vw,48px)' }}>
       <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '24px 0 28px', animation: 'riseIn .7s cubic-bezier(.22,.61,.36,1) both' }}>
@@ -33,7 +41,7 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
             <span className="mono" style={{ fontWeight: 700, letterSpacing: '.14em', fontSize: 13, textTransform: 'uppercase', color: 'rgba(243,245,244,.86)' }}>Clutch</span>
           </div>
           {onLoadDemo && (
-            <button onClick={onLoadDemo} className="mono" style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.045)', color: 'var(--dim)', borderRadius: 999, padding: '9px 13px', fontSize: 12, cursor: 'pointer', position: 'relative', zIndex: 20 }}>
+            <button onClick={handleDemoClick} className="mono" style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.045)', color: 'var(--dim)', borderRadius: 999, padding: '9px 13px', fontSize: 12, cursor: 'pointer', position: 'relative', zIndex: 20 }}>
               load demo
             </button>
           )}
@@ -43,7 +51,7 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
           <HeroMesh />
           <div style={{ position: 'relative', zIndex: 2, paddingTop: 10, transform: 'translateY(-36px)' }}>
             <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>AI accountability companion</span>
-            <h1 className="clutch-hero-title" style={{ fontSize: 'clamp(86px,7.5vw,134px)', marginBottom: 18 }}>
+            <h1 className="clutch-hero-title" style={{ fontSize: 'clamp(54px,7.5vw,134px)', marginBottom: 18 }}>
               CLUTCH
             </h1>
             <p style={{ fontSize: 'clamp(28px,2.25vw,42px)', lineHeight: 1.16, color: 'rgba(243,245,244,.9)', maxWidth: '20ch', marginBottom: 20, fontWeight: 500, letterSpacing: 0 }}>
@@ -58,9 +66,9 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
                 <span>{tasks.length > 0 ? 'Open my dashboard' : 'Start with my tasks'}</span>
                 <ArrowRight size={18} weight="bold" />
               </button>
-              {(onLoadDemo || onAddMore) && (
-                <button onClick={onLoadDemo ?? onAddMore} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '20px 23px', borderRadius: 14, fontSize: 17, fontWeight: 700 }}>
-                  <span>{tasks.length > 0 ? 'Add more tasks' : 'See the demo flow'}</span>
+              {onLoadDemo && (
+                <button onClick={handleDemoClick} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '20px 23px', borderRadius: 14, fontSize: 17, fontWeight: 700 }}>
+                  <span>{tasks.length > 0 ? 'Reset & see demo' : 'See the demo flow'}</span>
                 </button>
               )}
             </div>

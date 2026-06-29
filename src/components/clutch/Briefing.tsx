@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { ArrowRight, ArrowUUpLeft, BellRinging, CalendarPlus, CalendarX, ChartLineUp, ClockCounterClockwise, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, WarningOctagon } from '@phosphor-icons/react'
+import { useState, useEffect } from 'react'
+import { ArrowRight, ArrowUUpLeft, BellRinging, CalendarPlus, CalendarX, ChartLineUp, ClockCounterClockwise, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, WarningOctagon, List, DotsThreeOutline, X } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
 import { deadlineLabel, EFFORT_LABEL } from '@/lib/task'
@@ -15,6 +15,7 @@ interface Props {
   onEngage: (id: string) => void
   onDefer: (id: string) => void
   onAddMore: () => void
+  onLoadDemo?: () => void
 }
 
 type Screen = 'dashboard' | 'morning' | 'tasks' | 'brain' | 'day' | 'focus' | 'proof' | 'memory' | 'grounded'
@@ -43,12 +44,80 @@ const screenCopy: Record<Exclude<Screen, 'dashboard'>, { title: string; subtitle
   grounded: { title: 'Sources', subtitle: 'References saved when a task needs current or factual support.' },
 }
 
-export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }: Props) {
+export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, onLoadDemo }: Props) {
   const [dayPlan, setDayPlan] = useState<DayPlan | null>(null)
   const [planning, setPlanning] = useState(false)
   const [briefing, setBriefing] = useState<MorningBriefing | null>(null)
   const [briefingLoading, setBriefingLoading] = useState(false)
   const [screen, setScreen] = useState<Screen>('dashboard')
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [email, setEmail] = useState('')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setEmail(localStorage.getItem('clutch_user_email') || '')
+    }
+  }, [])
+
+  const handleEmailChange = (val: string) => {
+    setEmail(val)
+    localStorage.setItem('clutch_user_email', val)
+  }
+
+  // Overdue notification trigger
+  useEffect(() => {
+    if (!email || tasks.length === 0) return
+
+    const notified = JSON.parse(localStorage.getItem('clutch_notified_overdue') || '{}')
+    const now = Date.now()
+    let updated = false
+
+    tasks.forEach(async (task) => {
+      // Overdue deadline check
+      if (task.status !== 'done' && task.deadline && task.deadline < now) {
+        const key = `${task.id}-deadline`
+        if (!notified[key]) {
+          notified[key] = now
+          updated = true
+          try {
+            await fetch('/api/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, taskTitle: task.title, reason: 'deadline has passed' })
+            })
+          } catch (err) {
+            console.error('[notify] Failed to send deadline alert:', err)
+          }
+        }
+      }
+
+      // Expired commitment check
+      task.commitments.forEach(async (c) => {
+        const expirationTime = c.committedAt + c.durationMin * 60_000
+        if (!c.outcome && now > expirationTime) {
+          const key = `${c.id}-commitment`
+          if (!notified[key]) {
+            notified[key] = now
+            updated = true
+            try {
+              await fetch('/api/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, taskTitle: `${task.title} (commitment: ${c.action})`, reason: 'timer expired without proof' })
+              })
+            } catch (err) {
+              console.error('[notify] Failed to send commitment alert:', err)
+            }
+          }
+        }
+      })
+    })
+
+    if (updated) {
+      localStorage.setItem('clutch_notified_overdue', JSON.stringify(notified))
+    }
+  }, [tasks, email])
+
   const now = Date.now()
   const ranked = rankTasks(tasks, now)
   const top = ranked[0]
@@ -120,11 +189,18 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
             </div>
             <span className="mono" style={{ fontWeight: 600, letterSpacing: '.14em', fontSize: 13, textTransform: 'uppercase', color: 'rgba(243,245,244,.82)' }}>Clutch</span>
           </div>
-          {rate !== null && (
-            <span className="mono" style={{ fontSize: 12, color: 'var(--faint)' }}>
-              follow-through <span style={{ color: rate >= 60 ? 'var(--good)' : 'var(--warn)' }}>{rate}%</span>
-            </span>
-          )}
+          <div className="flex items-center gap-3.5">
+            {onLoadDemo && (
+              <button onClick={() => { if (window.confirm('Replace all current tasks with the demo flow?')) onLoadDemo() }} className="mono" style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.045)', color: 'var(--dim)', borderRadius: 999, padding: '5px 11px', fontSize: 11, cursor: 'pointer' }}>
+                load demo
+              </button>
+            )}
+            {rate !== null && (
+              <span className="mono" style={{ fontSize: 12, color: 'var(--faint)' }}>
+                follow-through <span style={{ color: rate >= 60 ? 'var(--good)' : 'var(--warn)' }}>{rate}%</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {!top ? (
@@ -140,26 +216,41 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
           </div>
         ) : (
           <div className="glass clutch-app-shell" style={{ flex: 1, display: 'grid', gridTemplateColumns: '210px minmax(0,1fr)', borderRadius: 22, overflow: 'hidden', background: 'linear-gradient(135deg, rgba(4,9,18,.9), rgba(2,5,12,.78))', border: '1px solid rgba(150,170,210,.24)', boxShadow: '0 46px 130px -54px rgba(0,0,0,1), 0 0 96px -60px rgba(0,136,255,.75), inset 0 1px 0 rgba(255,255,255,.07)' }}>
-            <aside className="clutch-app-sidebar" style={{ borderRight: '1px solid rgba(255,255,255,.08)', padding: 20, display: 'flex', flexDirection: 'column', gap: 11, background: 'rgba(0,0,0,.22)' }}>
-              <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
-                <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid rgba(77,200,255,.7)', display: 'grid', placeItems: 'center', boxShadow: '0 0 18px rgba(0,136,255,.22)' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
-                </div>
-                <span className="mono" style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.14em' }}>CLUTCH</span>
-              </div>
-              {navItems.map((item) => {
-                const active = screen === item.screen
-                return (
-                  <button
-                    key={item.screen}
-                    onClick={() => setScreen(item.screen)}
-                    style={{ border: 'none', textAlign: 'left', borderRadius: 9, padding: '10px 11px', background: active ? 'rgba(0,88,255,.42)' : 'transparent', color: active ? '#fff' : 'rgba(243,245,244,.62)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    {item.label}
-                  </button>
-                )
-              })}
-            </aside>
+             <aside className="clutch-app-sidebar" style={{ borderRight: '1px solid rgba(255,255,255,.08)', padding: 20, display: 'flex', flexDirection: 'column', gap: 11, background: 'rgba(0,0,0,.22)' }}>
+               <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
+                 <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid rgba(77,200,255,.7)', display: 'grid', placeItems: 'center', boxShadow: '0 0 18px rgba(0,136,255,.22)' }}>
+                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
+                 </div>
+                 <span className="mono" style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.14em' }}>CLUTCH</span>
+               </div>
+               <div className="flex flex-col gap-1.5" style={{ flex: 1 }}>
+                 {navItems.map((item) => {
+                   const active = screen === item.screen
+                   return (
+                     <button
+                       key={item.screen}
+                       onClick={() => setScreen(item.screen)}
+                       style={{ border: 'none', textAlign: 'left', borderRadius: 9, padding: '10px 11px', background: active ? 'rgba(0,88,255,.42)' : 'transparent', color: active ? '#fff' : 'rgba(243,245,244,.62)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                     >
+                       {item.label}
+                     </button>
+                   )
+                 })}
+               </div>
+
+               {/* Email Notification Panel */}
+               <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                 <div className="mono" style={{ fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--faint)', marginBottom: 8 }}>Email Alerts</div>
+                 <input
+                   type="email"
+                   placeholder="your@email.com"
+                   value={email}
+                   onChange={(e) => handleEmailChange(e.target.value)}
+                   style={{ width: '100%', background: 'rgba(0,0,0,.25)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '6px 9px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                 />
+                 {email && <div style={{ fontSize: 9, color: 'var(--good)', marginTop: 4, opacity: 0.85 }}>Alerts enabled</div>}
+               </div>
+             </aside>
 
             <section style={{ padding: '24px clamp(18px,2.2vw,32px) 28px', minWidth: 0 }}>
               <div className="flex items-start justify-between gap-4" style={{ marginBottom: 18 }}>
@@ -217,6 +308,69 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore }:
                 <GroundedScreen grounded={grounded} tasks={tasks} />
               )}
             </section>
+          </div>
+        )}
+
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="clutch-mobile-nav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(12, 11, 24, 0.96)', borderTop: '1px solid rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', zIndex: 100, padding: '10px 10px 14px', justifyContent: 'space-around', alignItems: 'center', boxShadow: '0 -10px 30px rgba(0,0,0,0.5)' }}>
+          {[
+            { screen: 'dashboard', label: 'Dashboard', icon: ChartLineUp },
+            { screen: 'tasks', label: 'Tasks', icon: List },
+            { screen: 'brain', label: 'Brain', icon: Plus },
+            { screen: 'day', label: 'Day Plan', icon: CalendarPlus },
+          ].map((item) => {
+            const Icon = item.icon
+            const active = screen === item.screen
+            return (
+              <button
+                key={item.screen}
+                onClick={() => { setScreen(item.screen as Screen); setShowMoreMenu(false) }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, border: 'none', background: 'transparent', color: active ? 'var(--accent)' : 'var(--faint)', cursor: 'pointer', outline: 'none' }}
+              >
+                <Icon size={20} weight={active ? 'fill' : 'bold'} />
+                <span className="mono" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.05em' }}>{item.label}</span>
+              </button>
+            )
+          })}
+          <button
+            onClick={() => setShowMoreMenu(true)}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, border: 'none', background: 'transparent', color: ['morning', 'focus', 'proof', 'memory', 'grounded'].includes(screen) || showMoreMenu ? 'var(--accent)' : 'var(--faint)', cursor: 'pointer', outline: 'none' }}
+          >
+            <DotsThreeOutline size={20} weight="bold" />
+            <span className="mono" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.05em' }}>More</span>
+          </button>
+        </nav>
+
+        {/* Mobile More Overlay Menu */}
+        {showMoreMenu && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }} onClick={() => setShowMoreMenu(false)}>
+            <div style={{ background: '#08070f', borderTop: '1px solid rgba(255,255,255,0.1)', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '24px 20px 34px', display: 'flex', flexDirection: 'column', gap: 10, animation: 'riseIn 0.28s cubic-bezier(0.23, 1, 0.32, 1) both' }} onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                <span className="mono" style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: 'var(--accent)' }}>MORE DEEP TOOLS</span>
+                <button onClick={() => setShowMoreMenu(false)} className="flex items-center justify-center" style={{ border: 'none', background: 'rgba(255,255,255,0.06)', color: 'var(--text)', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer' }}>
+                  <X size={16} weight="bold" />
+                </button>
+              </div>
+              {[
+                { screen: 'morning', label: 'Morning Briefing', desc: 'Proactive morning digest nudge' },
+                { screen: 'focus', label: 'Focus Block', desc: 'Calendar handoff & timer context' },
+                { screen: 'proof', label: 'Show Your Work', desc: 'Reviewed work and evidence' },
+                { screen: 'memory', label: 'Memory', desc: 'Behavioral signals and history' },
+                { screen: 'grounded', label: 'Sources', desc: 'Google Search grounded sources' },
+              ].map((item) => {
+                const active = screen === item.screen
+                return (
+                  <button
+                    key={item.screen}
+                    onClick={() => { setScreen(item.screen as Screen); setShowMoreMenu(false) }}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderRadius: 14, padding: '12px 16px', background: active ? 'rgba(90,99,230,0.18)' : 'rgba(255,255,255,0.03)', border: active ? '1px solid rgba(90,99,230,0.35)' : '1px solid rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}
+                  >
+                    <span style={{ fontSize: 14, fontWeight: 700, marginBottom: 2, color: active ? 'var(--accent)' : '#fff' }}>{item.label}</span>
+                    <span style={{ fontSize: 12, color: 'var(--dim)' }}>{item.desc}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -584,7 +738,7 @@ function MorningScreen({ briefing, loading, onGenerate, analytics, top, onEngage
                 color: 'var(--accent)',
               }}>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
-                Gemini 2.5 Flash
+                Gemini 2.5
               </div>
               <span style={{ fontSize: 11, color: 'var(--faint)' }}>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>

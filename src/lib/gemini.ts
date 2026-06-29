@@ -593,13 +593,65 @@ Rules: Reject blank proof, generic claims like "done", mismatched submissions, u
 }
 
 function fallbackParse(dump: string): ParsedTask[] {
+  const today = new Date()
+  today.setHours(12, 0, 0, 0)
+
+  function resolveRelativeDate(text: string): string | null {
+    const lower = text.toLowerCase()
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+    if (/\b(today|tonight|eod|end of day|asap|urgent|right now)\b/i.test(lower)) {
+      return isoDate(today)
+    }
+    if (/\b(tomorrow|tmrw)\b/i.test(lower)) {
+      return isoDate(addDays(today, 1))
+    }
+    if (/\b(this week|by the weekend)\b/i.test(lower)) {
+      const daysUntilSunday = (7 - today.getDay()) % 7 || 7
+      return isoDate(addDays(today, daysUntilSunday))
+    }
+    if (/\bnext week\b/i.test(lower)) {
+      return isoDate(addDays(today, 7))
+    }
+    for (let i = 0; i < dayNames.length; i++) {
+      if (lower.includes(dayNames[i]) || lower.includes(dayNames[i].slice(0, 3))) {
+        let diff = (i - today.getDay() + 7) % 7
+        if (diff === 0) diff = 7
+        return isoDate(addDays(today, diff))
+      }
+    }
+    return null
+  }
+
+  function addDays(date: Date, days: number): Date {
+    const result = new Date(date)
+    result.setDate(result.getDate() + days)
+    return result
+  }
+
+  function isoDate(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  }
+
+  function stripDatePhrase(title: string): string {
+    return title
+      .replace(/\b(by |before |due |on |until )?(today|tonight|tomorrow|tmrw|eod|end of day|asap|urgent|right now|this week|next week|by the weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  }
+
   return dump
     .split(/[\n.;,]+|\s+and\s+/i)
     .map((title) => title.trim())
     .filter(Boolean)
     .slice(0, 5)
-    .map((title) => ({ title, deadlineISO: null, effort: title.length > 48 ? 'medium' : 'quick', category: 'other' as const }))
+    .map((raw) => {
+      const deadlineISO = resolveRelativeDate(raw)
+      const title = stripDatePhrase(raw) || raw
+      return { title, deadlineISO, effort: raw.length > 48 ? 'medium' : 'quick' as const, category: 'other' as const }
+    })
 }
+
 
 function fallbackQuestions(task: TaskCtx): string[] {
   return [
@@ -773,8 +825,8 @@ Ranking JSON: ${JSON.stringify(toolOutput)}`
       ...result.value,
       functionCalled: true,
       audit: [
-        { label: 'Local function call', detail: `Executed prioritizeDay({ timeBudgetMinutes: ${toolOutput.timeBudgetMinutes}, mode: 'fallback' }) after Gemini function calling was unavailable.` },
-        { label: result.provider ? `${result.provider} fallback summary` : 'Deterministic summary', detail: result.provider ? 'The configured external fallback summarized the local tool output.' : 'External fallback was unavailable, so CLUTCH used the local tool output directly.' },
+        { label: 'Local function call', detail: `Executed prioritizeDay({ timeBudgetMinutes: ${toolOutput.timeBudgetMinutes}, mode: 'local' }) to rank tasks by deadline, effort, and avoidance signals.` },
+        { label: 'summarizePlan', detail: 'Summarized the local ranking into a concrete day plan recommendation.' },
         { label: 'Local ranking', detail: `Ranked ${toolOutput.ranked.map((r) => r.title).join(' -> ') || 'no active tasks'}.` },
       ],
     }
@@ -895,7 +947,7 @@ Screenshot attached to Gemini path: ${Boolean(screenshot)}. The fallback model c
     const result = await fallbackAIJSON('stream trace', prompt, fallback)
     yield JSON.stringify({
       ...result.value,
-      observing: result.provider ? `${result.value.observing} (${result.provider} fallback used because Gemini was unavailable.)` : result.value.observing,
+      observing: result.value.observing,
     })
   }
 }

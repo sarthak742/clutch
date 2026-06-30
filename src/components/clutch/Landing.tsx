@@ -104,6 +104,10 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
                 </div>
               ))}
             </div>
+
+            <div className="mono" style={{ marginTop: 24, fontSize: 11, lineHeight: 1.65, color: 'rgba(243,245,244,.42)', maxWidth: '54ch', letterSpacing: '.02em' }}>
+              6 named Gemini agents on a deterministic spine · every model call has retries, a 22s timeout, multi-key failover, and a local fallback — so the core loop never hard-fails.
+            </div>
           </div>
 
           <LivePreview tasks={tasks} topTitle={top?.task.title} risk={top ? Math.min(99, Math.max(15, Math.round(top.score))) : null} stats={stats} followUp={followUp?.message} focusBlock={focusBlock?.commitment.durationMin} groundedCount={grounded?.sources.length ?? 0} />

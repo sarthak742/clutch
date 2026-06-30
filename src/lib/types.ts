@@ -70,6 +70,8 @@ export interface ClutchTask {
   deadline: number | null
   effort: Effort
   category: TaskCategory
+  /** Gemini-decided hours before the deadline to send a proactive alert (by complexity). */
+  alertLeadHours?: number
   status: TaskStatus
   // ── behavioral signals (real, logged — not inferred) ──
   createdAt: number
@@ -103,6 +105,8 @@ export interface ParsedTask {
   deadlineISO: string | null
   effort: Effort
   category: TaskCategory
+  /** Hours before the deadline to warn, chosen by complexity. */
+  alertLeadHours?: number
 }
 
 export interface FollowThrough {

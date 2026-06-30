@@ -51,6 +51,7 @@ function migrateTask(raw: unknown): ClutchTask | null {
     deadline,
     effort,
     category,
+    alertLeadHours: typeof task.alertLeadHours === 'number' && task.alertLeadHours > 0 ? task.alertLeadHours : undefined,
     status,
     createdAt: asNumber(task.createdAt, now),
     lastTouched: asNumber(task.lastTouched, now),

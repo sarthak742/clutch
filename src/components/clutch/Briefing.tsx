@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ArrowRight, ArrowUUpLeft, BellRinging, Bell, CalendarPlus, CalendarX, ChartLineUp, ClockCounterClockwise, EnvelopeSimple, HourglassMedium, LinkSimple, MoonStars, Plus, ShieldCheck, Sun, WarningOctagon, List, DotsThreeOutline, X, SpeakerHigh, SpeakerSlash } from '@phosphor-icons/react'
 import type { ClutchTask, FollowThrough } from '@/lib/types'
 import { rankTasks } from '@/lib/triage'
-import { deadlineLabel, EFFORT_LABEL, calendarFocusBlockUrl } from '@/lib/task'
+import { deadlineLabel, EFFORT_LABEL, calendarFocusBlockUrl, alertWindowStart, effortLeadHours } from '@/lib/task'
 import type { DayPlan, MorningBriefing } from '@/lib/gemini'
 import { computeStreak, followUpMemory, latestFocusBlock, latestGroundedSources, overviewStats } from '@/lib/overview'
 import { timeMemory } from '@/lib/timeMemory'
@@ -14,6 +14,7 @@ interface Props {
   followThrough: FollowThrough
   onEngage: (id: string) => void
   onDefer: (id: string) => void
+  onUpdateTask: (id: string, patch: Partial<ClutchTask>) => void
   onAddMore: () => void
   onLoadDemo?: () => void
 }
@@ -44,7 +45,7 @@ const screenCopy: Record<Exclude<Screen, 'dashboard'>, { title: string; subtitle
   grounded: { title: 'Sources', subtitle: 'References saved when a task needs current or factual support.' },
 }
 
-export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, onLoadDemo }: Props) {
+export function Briefing({ tasks, followThrough, onEngage, onDefer, onUpdateTask, onAddMore, onLoadDemo }: Props) {
   const [dayPlan, setDayPlan] = useState<DayPlan | null>(null)
   const [planning, setPlanning] = useState(false)
   const [briefing, setBriefing] = useState<MorningBriefing | null>(null)
@@ -94,17 +95,21 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
     let updated = false
 
     tasks.forEach(async (task) => {
-      // Overdue deadline check
-      if (task.status !== 'done' && task.deadline && task.deadline < now) {
+      // Proactive deadline warning: fire once we enter the lead window Gemini chose.
+      const windowStart = alertWindowStart(task)
+      if (task.status !== 'done' && windowStart !== null && now >= windowStart) {
         const key = `${task.id}-deadline`
         if (!notified[key]) {
           notified[key] = now
           updated = true
+          const hoursLeft = task.deadline! > now ? Math.round((task.deadline! - now) / 3_600_000) : -1
+          const upcoming = hoursLeft >= 0
+          const reason = upcoming ? `due in ${hoursLeft < 1 ? 'under an hour' : `${hoursLeft} hour${hoursLeft === 1 ? '' : 's'}`}` : 'the deadline has passed'
           try {
             await fetch('/api/notify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, taskTitle: task.title, reason: 'deadline has passed' })
+              body: JSON.stringify({ email, taskTitle: task.title, reason, upcoming })
             })
           } catch (err) {
             console.error('[notify] Failed to send deadline alert:', err)
@@ -336,7 +341,7 @@ export function Briefing({ tasks, followThrough, onEngage, onDefer, onAddMore, o
               )}
 
               {screen === 'tasks' && (
-                <TasksScreen ranked={ranked} now={now} onEngage={onEngage} />
+                <TasksScreen ranked={ranked} now={now} onEngage={onEngage} onUpdateTask={onUpdateTask} hasEmail={Boolean(email)} />
               )}
 
               {screen === 'brain' && (
@@ -533,11 +538,31 @@ function TopRiskCard({ top, onEngage, onDefer }: { top: ReturnType<typeof rankTa
   )
 }
 
-function TasksScreen({ ranked, now, onEngage }: { ranked: ReturnType<typeof rankTasks>; now: number; onEngage: (id: string) => void }) {
+function TasksScreen({ ranked, now, onEngage, onUpdateTask, hasEmail }: { ranked: ReturnType<typeof rankTasks>; now: number; onEngage: (id: string) => void; onUpdateTask: (id: string, patch: Partial<ClutchTask>) => void; hasEmail: boolean }) {
+  const [nudgeDismissed, setNudgeDismissed] = useState(true)
+  useEffect(() => {
+    setNudgeDismissed(typeof window !== 'undefined' && localStorage.getItem('clutch_reminder_nudge_dismissed') === '1')
+  }, [])
+  const showNudge = !hasEmail && !nudgeDismissed && ranked.some((r) => r.task.deadline != null)
   return (
     <div style={{ display: 'grid', gap: 10 }}>
+      {showNudge && (
+        <div className="glass flex items-center" style={{ gap: 12, borderRadius: 16, padding: '13px 16px', border: '1px solid rgba(90,99,230,.3)' }}>
+          <BellRinging size={18} weight="fill" style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 13.5, lineHeight: 1.45, color: 'var(--dim)' }}>
+            Want a heads-up before these slip? Add your email under <strong style={{ color: 'var(--text)' }}>Email alerts</strong> in the sidebar — CLUTCH emails you at the right time for each task.
+          </div>
+          <button
+            onClick={() => { localStorage.setItem('clutch_reminder_nudge_dismissed', '1'); setNudgeDismissed(true) }}
+            className="mono"
+            style={{ flexShrink: 0, fontSize: 11, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            never ask again
+          </button>
+        </div>
+      )}
       {ranked.map((r) => (
-        <TaskRow key={r.task.id} ranked={r} now={now} onEngage={onEngage} />
+        <TaskRow key={r.task.id} ranked={r} now={now} onEngage={onEngage} onUpdateTask={onUpdateTask} hasEmail={hasEmail} />
       ))}
     </div>
   )
@@ -706,26 +731,63 @@ function TaskTeaser({ tasks, now, onScreen }: { tasks: ReturnType<typeof rankTas
   )
 }
 
-function TaskRow({ ranked, now, onEngage }: { ranked: ReturnType<typeof rankTasks>[number]; now: number; onEngage: (id: string) => void }) {
+const LEAD_OPTIONS: { h: number; label: string }[] = [
+  { h: 2, label: '2h before' },
+  { h: 4, label: '4h before' },
+  { h: 8, label: '8h before' },
+  { h: 12, label: '12h before' },
+  { h: 24, label: '1 day before' },
+  { h: 48, label: '2 days before' },
+  { h: 72, label: '3 days before' },
+]
+
+function TaskRow({ ranked, now, onEngage, onUpdateTask, hasEmail }: { ranked: ReturnType<typeof rankTasks>[number]; now: number; onEngage: (id: string) => void; onUpdateTask: (id: string, patch: Partial<ClutchTask>) => void; hasEmail: boolean }) {
   const dc = dotColor(ranked.score)
-  const memory = timeMemory(ranked.task, now)
+  const task = ranked.task
+  const memory = timeMemory(task, now)
+  const leadH = typeof task.alertLeadHours === 'number' && task.alertLeadHours > 0 ? task.alertLeadHours : effortLeadHours(task.effort)
+  const windowStart = alertWindowStart(task)
+  const reminderLabel = windowStart != null
+    ? new Date(windowStart).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : null
   return (
-    <button
-      onClick={() => onEngage(ranked.task.id)}
-      className="flex items-center gap-3.5 text-left"
+    <div
+      onClick={() => onEngage(task.id)}
+      className="text-left"
       style={{ padding: '16px 18px', borderRadius: 18, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', cursor: 'pointer', color: 'inherit', transition: 'background .2s, border-color .2s, transform .15s' }}
     >
-      <div style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, background: dc.c, boxShadow: `0 0 10px 1px ${dc.g}` }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ranked.task.title}</div>
-        <div style={{ fontSize: 13, color: 'var(--faint)', marginTop: 3 }}>
-          {deadlineLabel(ranked.task.deadline, now)} / {memory.lastTouched} / {EFFORT_LABEL[ranked.task.effort]}{ranked.task.deferralCount > 0 ? ` / dodged ${ranked.task.deferralCount}x` : ''}
+      <div className="flex items-center gap-3.5">
+        <div style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, background: dc.c, boxShadow: `0 0 10px 1px ${dc.g}` }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</div>
+          <div style={{ fontSize: 13, color: 'var(--faint)', marginTop: 3 }}>
+            {deadlineLabel(task.deadline, now)} / {memory.lastTouched} / {EFFORT_LABEL[task.effort]}{task.deferralCount > 0 ? ` / dodged ${task.deferralCount}x` : ''}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5" style={{ flexShrink: 0, color: 'rgba(90,99,230,.9)', fontSize: 13, fontWeight: 700 }}>
+          <span>Start</span><ArrowRight size={15} weight="bold" />
         </div>
       </div>
-      <div className="flex items-center gap-1.5" style={{ flexShrink: 0, color: 'rgba(90,99,230,.9)', fontSize: 13, fontWeight: 700 }}>
-        <span>Start</span><ArrowRight size={15} weight="bold" />
-      </div>
-    </button>
+      {reminderLabel && (
+        <div onClick={(e) => e.stopPropagation()} className="flex items-center" style={{ gap: 8, marginTop: 12, paddingTop: 11, borderTop: '1px solid rgba(255,255,255,.07)', flexWrap: 'wrap' }}>
+          <BellRinging size={13} weight="fill" style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <span style={{ fontSize: 12.5, color: 'var(--dim)', flex: 1, minWidth: 0 }}>
+            {hasEmail ? 'Email reminder ' : 'Would remind you '}
+            <strong style={{ color: 'var(--text)' }}>{reminderLabel}</strong>
+            <span style={{ color: 'var(--faint)' }}> · Gemini estimates ~{leadH}h of runway</span>
+          </span>
+          <select
+            aria-label="Reminder lead time"
+            value={leadH}
+            onChange={(e) => onUpdateTask(task.id, { alertLeadHours: Number(e.target.value) })}
+            style={{ background: 'rgba(0,0,0,.25)', color: 'var(--text)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}
+          >
+            {!LEAD_OPTIONS.some((o) => o.h === leadH) && <option value={leadH}>{leadH}h before</option>}
+            {LEAD_OPTIONS.map((o) => <option key={o.h} value={o.h}>{o.label}</option>)}
+          </select>
+        </div>
+      )}
+    </div>
   )
 }
 

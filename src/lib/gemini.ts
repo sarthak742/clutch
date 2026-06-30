@@ -15,13 +15,22 @@ const FALLBACK_AI_TIMEOUT_MS = 45_000
 // Lazily construct the client so a missing key produces a clear, actionable
 // error at call time rather than a cryptic auth failure deep in the SDK.
 // Multiple keys are rotated on 429 rate-limit errors to maximise free-tier quota.
+// Sanitize each key: env values sometimes arrive wrapped in quotes or with
+// trailing whitespace (a common copy-paste/console mistake), which makes the
+// Gemini API reject an otherwise-valid key with API_KEY_INVALID.
+function sanitizeKey(k: string | undefined): string | undefined {
+  if (!k) return undefined
+  const cleaned = k.trim().replace(/^["']+|["']+$/g, '').trim()
+  return cleaned || undefined
+}
+
 const GEMINI_KEYS: string[] = [
   process.env.FOCUS_AGENT_GEMINI_KEY,
   process.env.FOCUS_AGENT_GEMINI_KEY_2,
   process.env.FOCUS_AGENT_GEMINI_KEY_3,
   process.env.FOCUS_AGENT_GEMINI_KEY_4,
   process.env.GOOGLE_API_KEY,
-].filter(Boolean) as string[]
+].map(sanitizeKey).filter(Boolean) as string[]
 
 let _keyIndex = 0
 
@@ -39,6 +48,13 @@ function getClient(keyIndex?: number): GoogleGenAI {
 function isRateLimitError(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e)
   return /429|rate.?limit|quota/i.test(msg)
+}
+
+// A bad/invalid/forbidden key for one account shouldn't kill Gemini outright —
+// fail over to the next configured key just like we do on rate limits.
+function isKeyError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e)
+  return /API_KEY_INVALID|api key not valid|invalid api key|PERMISSION_DENIED|\b401\b|\b403\b/i.test(msg)
 }
 
 const TRACE_SCHEMA = {
@@ -75,6 +91,10 @@ async function withGeminiResilience<T>(label: string, call: (client: GoogleGenAI
         // Rotate to next key on rate limit
         _keyIndex = (_keyIndex + 1) % totalKeys
         console.warn(`[gemini] Rate limit hit on key ${keyIndex}, rotating to key ${_keyIndex}`)
+      } else if (isKeyError(e) && totalKeys > 1) {
+        // Rotate to next key when one account's key is invalid/forbidden
+        _keyIndex = (_keyIndex + 1) % totalKeys
+        console.warn(`[gemini] Key ${keyIndex} rejected (auth error), rotating to key ${_keyIndex}`)
       } else if (attempt === 0) {
         await sleep(700)
       } else {
@@ -165,7 +185,7 @@ function parseJSON<T>(text: string | undefined, fallback: T): T {
 export async function parseBrainDump(dump: string, todayISO: string): Promise<ParsedTask[]> {
   const fallback = { tasks: fallbackParse(dump) }
   const todayLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
-  const prompt = `Today is ${todayISO} (${todayLabel}). The user dumped everything on their mind below. Extract each distinct task or commitment. For each: a short imperative title, a deadline as an ISO date (YYYY-MM-DD) resolved relative to today, an effort tier ("quick" < 15 min, "medium" ~1 hour, "deep" multi-hour), and a category.\n\nDeadline resolution rules - apply in order:\n- "tonight", "today", "EOD", "end of day", "ASAP", "urgent", "right now" -> ${todayISO}\n- "tomorrow", "tmrw" -> the day after ${todayISO}\n- A specific time like "tomorrow 8am" or "Friday 2pm" -> resolve the date, drop the time\n- A weekday name like "Friday" or "Monday" -> the next occurrence of that day from today\n- "this week" or "by the weekend" -> the upcoming Sunday\n- "next week" -> 7 days from today\n- No deadline mentioned and none strongly implied -> null\n\nDo not invent tasks. Ignore sentences that are meta-context about the user (time available, self-descriptions like "I am weak on X", filler like "I need a plan") - only extract actual tasks or commitments. Return JSON as {"tasks":[{"title":"...","deadlineISO":null,"effort":"quick","category":"work"}]}.\n\nBrain dump:\n"""${dump}"""`
+  const prompt = `Today is ${todayISO} (${todayLabel}). The user dumped everything on their mind below. Extract each distinct task or commitment. For each: a short imperative title, a deadline as an ISO date (YYYY-MM-DD) resolved relative to today, an effort tier ("quick" < 15 min, "medium" ~1 hour, "deep" multi-hour), a category, and alertLeadHours.\n\nalertLeadHours = how many hours BEFORE the deadline CLUTCH should send a proactive warning, decided by how much runway the task realistically needs given its complexity and stakes. A quick reply or errand needs little warning (~2-4). An hour-ish task needs a half day (~8-12). A deep, multi-hour, or high-stakes task (a report, a deployment, an exam) needs a full day or two (24-48). Return a positive number of hours.\n\nDeadline resolution rules - apply in order:\n- "tonight", "today", "EOD", "end of day", "ASAP", "urgent", "right now" -> ${todayISO}\n- "tomorrow", "tmrw" -> the day after ${todayISO}\n- A specific time like "tomorrow 8am" or "Friday 2pm" -> resolve the date, drop the time\n- A weekday name like "Friday" or "Monday" -> the next occurrence of that day from today\n- "this week" or "by the weekend" -> the upcoming Sunday\n- "next week" -> 7 days from today\n- No deadline mentioned and none strongly implied -> null\n\nDo not invent tasks. Ignore sentences that are meta-context about the user (time available, self-descriptions like "I am weak on X", filler like "I need a plan") - only extract actual tasks or commitments. Return JSON as {"tasks":[{"title":"...","deadlineISO":null,"effort":"quick","category":"work","alertLeadHours":4}]}.\n\nBrain dump:\n"""${dump}"""`
   let parsed: { tasks: ParsedTask[] }
   try {
     const response = await withGeminiResilience('parse brain dump', (client) => client.models.generateContent({
@@ -188,9 +208,10 @@ export async function parseBrainDump(dump: string, todayISO: string): Promise<Pa
                     type: 'string',
                     enum: ['work', 'study', 'admin', 'personal', 'errand', 'other'],
                   },
+                  alertLeadHours: { type: 'number' },
                 },
-                required: ['title', 'deadlineISO', 'effort', 'category'],
-                propertyOrdering: ['title', 'deadlineISO', 'effort', 'category'],
+                required: ['title', 'deadlineISO', 'effort', 'category', 'alertLeadHours'],
+                propertyOrdering: ['title', 'deadlineISO', 'effort', 'category', 'alertLeadHours'],
               },
             },
           },

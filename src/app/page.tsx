@@ -123,6 +123,7 @@ export default function Home() {
                 followThrough={followThrough}
                 onEngage={handleEngage}
                 onDefer={handleDefer}
+                onUpdateTask={updateTask}
                 onAddMore={() => setView('capture')}
                 onLoadDemo={() => handleLoadDemo(true)}
               />

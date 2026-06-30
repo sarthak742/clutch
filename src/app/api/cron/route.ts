@@ -1,11 +1,14 @@
 import { listSubscribers, saveNotified } from '@/lib/subscribers'
 import { sendOverdueAlert } from '@/lib/email'
+import { alertWindowStart } from '@/lib/task'
+import type { Effort } from '@/lib/types'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Triggered by Cloud Scheduler once a day. Secured by a shared secret that the
+// Triggered by Cloud Scheduler (hourly). Secured by a shared secret that the
 // scheduler sends as `Authorization: Bearer <CRON_SECRET>`. This is what makes
 // CLUTCH's proactivity real and server-side: it runs whether or not any user
-// has the tab open.
+// has the tab open, and it warns BEFORE the deadline using a per-task lead time
+// that Gemini chose from the task's complexity.
 
 interface CronCommitment {
   id?: string
@@ -19,7 +22,17 @@ interface CronTask {
   title?: string
   status?: string
   deadline?: number | null
+  effort?: Effort
+  alertLeadHours?: number
   commitments?: CronCommitment[]
+}
+
+function dueReason(deadline: number, now: number): { reason: string; upcoming: boolean } {
+  if (deadline <= now) return { reason: 'the deadline has passed', upcoming: false }
+  const hours = Math.round((deadline - now) / 3_600_000)
+  if (hours < 1) return { reason: 'due in under an hour', upcoming: true }
+  if (hours < 48) return { reason: `due in ${hours} hour${hours === 1 ? '' : 's'}`, upcoming: true }
+  return { reason: `due in ${Math.round(hours / 24)} days`, upcoming: true }
 }
 
 async function runCron(req: NextRequest) {
@@ -40,12 +53,17 @@ async function runCron(req: NextRequest) {
     for (const task of sub.tasks as CronTask[]) {
       if (!task || typeof task !== 'object') continue
 
-      // Overdue deadline
-      if (task.status !== 'done' && task.status !== 'dropped' && typeof task.deadline === 'number' && task.deadline < now) {
-        const key = `${task.id}-deadline`
-        if (!notified[key]) {
-          const ok = await sendOverdueAlert(sub.email, task.title || 'a task', 'deadline has passed')
-          if (ok) { notified[key] = now; changed = true; sent += 1 }
+      // Proactive deadline warning: fire once we enter the Gemini-decided lead
+      // window before the deadline (this also covers the already-overdue case).
+      if (task.status !== 'done' && task.status !== 'dropped' && typeof task.deadline === 'number') {
+        const windowStart = alertWindowStart({ deadline: task.deadline, effort: task.effort ?? 'medium', alertLeadHours: task.alertLeadHours })
+        if (windowStart !== null && now >= windowStart) {
+          const key = `${task.id}-deadline`
+          if (!notified[key]) {
+            const { reason, upcoming } = dueReason(task.deadline, now)
+            const ok = await sendOverdueAlert(sub.email, task.title || 'a task', reason, upcoming)
+            if (ok) { notified[key] = now; changed = true; sent += 1 }
+          }
         }
       }
 

@@ -456,23 +456,96 @@ Return JSON with keys diagnosis, suggestedAction, suggestedMinutes, artifact, ag
     parsed = fallbackResult.value
     fallbackProvider = fallbackResult.provider
   }
-  const sources = await groundedSourcesForTask(task, qa)
+  const { sources, decision } = await groundedSourcesForTask(task, qa)
   const fallbackTrace = fallbackProvider
     ? [{ label: 'generateArtifact', detail: `Built a starting point using the extended AI pipeline for this task.` }]
     : []
+  const groundingTrace = [{
+    label: decision.ground ? 'decideGrounding → fetch' : 'decideGrounding → skip',
+    detail: decision.reasoning,
+  }]
   const sourceTrace = sources.length
     ? [{ label: 'groundWithGoogleSearch', detail: `Fetched ${sources.length} grounded reference source(s) for this task.` }]
     : []
   return {
     ...parsed,
-    agentTrace: [...fallbackTrace, ...(parsed.agentTrace?.length ? parsed.agentTrace : fallback.agentTrace ?? []), ...sourceTrace],
+    agentTrace: [...fallbackTrace, ...(parsed.agentTrace?.length ? parsed.agentTrace : fallback.agentTrace ?? []), ...groundingTrace, ...sourceTrace],
     toolCalls: parsed.toolCalls?.length ? parsed.toolCalls : fallback.toolCalls,
     sources: sources.length ? sources : undefined,
   }
 }
 
-async function groundedSourcesForTask(task: TaskCtx, qa: QAPair[]): Promise<GroundedSource[]> {
-  if (!shouldUseGrounding(task, qa)) return []
+interface GroundingDecision { ground: boolean; focus: string; reasoning: string }
+
+/**
+ * Genuine model-driven agency: instead of a hard-coded keyword regex deciding
+ * whether to pull external sources, Gemini decides for itself by choosing
+ * whether to call the `fetchSources` tool. If it calls the tool we ground using
+ * the model's own search focus; if it declines we skip grounding. The old regex
+ * survives only as a deterministic fallback when the decision call fails.
+ */
+async function decideGrounding(task: TaskCtx, qa: QAPair[]): Promise<GroundingDecision> {
+  const heuristic = shouldUseGrounding(task, qa)
+  const context = qa.filter((p) => p.answer.trim()).map((p) => `${p.question}: ${p.answer}`).join('\n')
+
+  const declaration = {
+    name: 'fetchSources',
+    description:
+      'Fetch current real-world reference sources via Google Search. Call ONLY when this task genuinely needs factual, up-to-date, or research-based external references (studying a topic, technical docs, citations, comparisons). Do NOT call for purely personal, admin, or errand tasks that need no outside information.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        focus: { type: 'string', description: 'A short search focus describing exactly what to look up.' },
+        reasoning: { type: 'string', description: 'One sentence on why sources are or are not needed.' },
+      },
+      required: ['focus', 'reasoning'],
+    },
+  }
+
+  try {
+    const res = await withGeminiResilience('decide grounding', (client) => client.models.generateContent({
+      model: MODEL,
+      contents: `Decide whether this task needs external reference sources before the user starts.
+If it does, call fetchSources with a focused query. If it does not, reply with one short sentence explaining why and call no tool.
+
+Task: "${task.title}"
+Category: ${task.category}
+Context:
+${context || '(none)'}`,
+      config: {
+        tools: [{ functionDeclarations: [declaration] }],
+        toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO } },
+      },
+    }))
+
+    const call = res.functionCalls?.[0]
+    if (call?.name === 'fetchSources') {
+      return {
+        ground: true,
+        focus: String(call.args?.focus || task.title),
+        reasoning: String(call.args?.reasoning || 'Model judged this task needs external references.'),
+      }
+    }
+    return {
+      ground: false,
+      focus: '',
+      reasoning: (res.text || 'Model judged no external sources are needed.').trim().slice(0, 200),
+    }
+  } catch (error) {
+    console.warn('[gemini] grounding decision failed, using heuristic:', error)
+    return {
+      ground: heuristic,
+      focus: task.title,
+      reasoning: heuristic
+        ? 'Heuristic fallback: research-style task, fetching sources.'
+        : 'Heuristic fallback: no external references needed.',
+    }
+  }
+}
+
+async function groundedSourcesForTask(task: TaskCtx, qa: QAPair[]): Promise<{ sources: GroundedSource[]; decision: GroundingDecision }> {
+  const decision = await decideGrounding(task, qa)
+  if (!decision.ground) return { sources: [], decision }
 
   const context = qa.filter((p) => p.answer.trim()).map((p) => `${p.question}: ${p.answer}`).join('\n')
   try {
@@ -481,6 +554,7 @@ async function groundedSourcesForTask(task: TaskCtx, qa: QAPair[]): Promise<Grou
       contents: `Use Google Search grounding to find current, credible sources that would help the user with this task.
 
 Task: "${task.title}"
+Search focus: ${decision.focus || task.title}
 User context:
 ${context || '(none)'}
 
@@ -491,13 +565,15 @@ ${context || '(none)'}
         tools: [{ googleSearch: {} }, { urlContext: {} }],
       },
     }))
-    return extractGroundedSources(response)
+    return { sources: extractGroundedSources(response), decision }
   } catch (error) {
     console.warn('[gemini] Google Search grounding unavailable:', error)
-    return []
+    return { sources: [], decision }
   }
 }
 
+// Deterministic fallback used only when the model-driven grounding decision is
+// itself unavailable (see decideGrounding). Kept intentionally simple.
 function shouldUseGrounding(task: TaskCtx, qa: QAPair[]): boolean {
   const haystack = [
     task.title,

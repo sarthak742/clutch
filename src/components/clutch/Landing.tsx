@@ -50,7 +50,7 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
         <section className="hero-section-grid" style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(500px,.82fr) minmax(650px,1.08fr)', gap: 'clamp(74px,6vw,112px)', alignItems: 'center', padding: '10px 0 14px' }}>
           <HeroMesh />
           <div style={{ position: 'relative', zIndex: 2, paddingTop: 10, transform: 'translateY(-36px)' }}>
-            <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>AI accountability companion</span>
+            <span className="eyebrow" style={{ display: 'inline-block', marginBottom: 16 }}>Proof-based accountability agent</span>
             <h1 className="clutch-hero-title" style={{ fontSize: 'clamp(54px,7.5vw,134px)', marginBottom: 18 }}>
               CLUTCH
             </h1>
@@ -91,11 +91,11 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
 
             <div className="hero-feature-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))', gap: 0, maxWidth: 620 }}>
               {[
-                ['Follow-up memory', 'Picks up where you left off', CheckCircle],
+                ['Proof that counts', 'Accepted, partial, or rejected', ShieldCheck],
                 ['Risk detection', "Flags what's most likely to slip", Crosshair],
                 ['Gemini planning', 'Function-calling for day plans', Brain],
                 ['Grounded answers', 'Backed by real sources', MagnifyingGlass],
-                ['Proof that counts', 'Accepted, partial, or rejected', ShieldCheck],
+                ['Follow-up memory', 'Picks up where you left off', CheckCircle],
               ].map(([label, detail, Icon]) => (
                 <div key={label as string} className="hero-feature">
                   <Icon size={28} color="#7f93ff" weight="regular" />

@@ -7,7 +7,7 @@ import { Capture } from '@/components/clutch/Capture'
 import { Briefing } from '@/components/clutch/Briefing'
 import { Engage } from '@/components/clutch/Engage'
 import { AppBackground } from '@/components/clutch/AppBackground'
-import { loadClutchState, saveClutchState } from '@/lib/store'
+import { loadClutchState, saveClutchState, normalizeRemoteTasks } from '@/lib/store'
 import { fromParsed } from '@/lib/task'
 import { createDemoState } from '@/lib/demo'
 import type { ClutchTask, ParsedTask, FollowThrough } from '@/lib/types'
@@ -27,6 +27,28 @@ export default function Home() {
     setFollowThrough(state.followThrough)
     setView('landing')
     setReady(true)
+
+    // Durable persistence: if this device has nothing stored locally but has
+    // previously synced a snapshot to the server (alerts enabled), pull it back
+    // so cleared storage / a reopened session doesn't silently lose real tasks.
+    if (state.tasks.length === 0 && typeof window !== 'undefined') {
+      const clientId = localStorage.getItem('clutch-client-id')
+      if (clientId) {
+        fetch(`/api/subscribe?clientId=${encodeURIComponent(clientId)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            const restored = normalizeRemoteTasks(data?.tasks)
+            if (restored.length > 0) {
+              setTasks((current) => {
+                if (current.length > 0) return current // user already started adding
+                saveClutchState(restored, { committed: 0, completed: 0 })
+                return restored
+              })
+            }
+          })
+          .catch(() => {})
+      }
+    }
   }, [])
 
   const persist = (next: ClutchTask[], nextFollowThrough = followThrough) => {

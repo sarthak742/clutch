@@ -117,3 +117,26 @@ export async function saveNotified(clientId: string, notified: Record<string, nu
     // fail soft
   }
 }
+
+
+// Read back ONE subscriber's task snapshot (keyed by clientId). Used to
+// rehydrate the client after localStorage is cleared, the browser is changed,
+// or the app is reopened on a fresh device that shares the same clientId.
+// Returns null on any failure or when running off-GCP, so callers fall back to
+// whatever local state they already have.
+export async function getSubscriberSnapshot(clientId: string): Promise<{ tasks: unknown[] } | null> {
+  if (!subscribersEnabled() || !clientId) return null
+  const token = await accessToken()
+  if (!token) return null
+  try {
+    const url = `${BASE}/${COLLECTION}/${encodeURIComponent(clientId)}`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) return null
+    const json = (await res.json()) as { fields?: { tasksJson?: { stringValue?: string } } }
+    let tasks: unknown[] = []
+    try { tasks = JSON.parse(json.fields?.tasksJson?.stringValue || '[]') } catch { tasks = [] }
+    return { tasks: Array.isArray(tasks) ? tasks : [] }
+  } catch {
+    return null
+  }
+}

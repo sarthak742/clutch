@@ -129,3 +129,11 @@ export function saveFollowThrough(ft: FollowThrough) {
   if (typeof window === 'undefined') return
   localStorage.setItem(FT_KEY, JSON.stringify(ft))
 }
+
+
+// Normalize a task snapshot pulled back from the server (Firestore) into safe,
+// fully-shaped ClutchTask objects, reusing the same migration the local loader
+// uses. Demo tasks are never synced, so nothing demo-shaped can arrive here.
+export function normalizeRemoteTasks(raw: unknown): ClutchTask[] {
+  return migrateTasks(raw)
+}

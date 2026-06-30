@@ -48,3 +48,8 @@ judge_env/
 clutch_judge_report.txt
 __pycache__/
 *.pyc
+
+# Hackathon judging artifacts
+clutch-judge-screenshots/
+SCHEDULER_SETUP.md
+deploy.sh

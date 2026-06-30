@@ -8,7 +8,7 @@ const MODEL = 'gemini-2.5-flash'
 // Free-tier Flash models only (no Pro). Both are overridable via env in case
 // Google renames the preview model strings.
 const TTS_MODEL = process.env.FOCUS_AGENT_TTS_MODEL || 'gemini-2.5-flash-preview-tts'
-const EMBED_MODEL = process.env.FOCUS_AGENT_EMBED_MODEL || 'text-embedding-004'
+const EMBED_MODEL = process.env.FOCUS_AGENT_EMBED_MODEL || 'gemini-embedding-001'
 const GEMINI_TIMEOUT_MS = 22_000
 const FALLBACK_AI_TIMEOUT_MS = 45_000
 
@@ -1228,15 +1228,25 @@ function pcmBase64ToWavBase64(pcmBase64: string, mime: string): string {
 
 // ── Semantic duplicate detection — Gemini text embeddings ─────────
 export async function embedTexts(texts: string[]): Promise<number[][] | null> {
-  const cleaned = texts.map((t) => t.trim()).filter(Boolean)
+  // Cap to keep the number of embed calls (and free-tier quota use) bounded.
+  const cleaned = texts.map((t) => t.trim()).filter(Boolean).slice(0, 24)
   if (cleaned.length === 0) return null
   try {
-    const response = await withGeminiResilience('embed texts', (client) =>
-      client.models.embedContent({ model: EMBED_MODEL, contents: cleaned } as unknown as Parameters<typeof client.models.embedContent>[0]),
+    // Embed one text per call — gemini-embedding-001 takes a single content,
+    // so this is the portable path across embedding models.
+    const responses = await Promise.all(
+      cleaned.map((text) =>
+        withGeminiResilience('embed text', (client) =>
+          client.models.embedContent({ model: EMBED_MODEL, contents: text } as unknown as Parameters<typeof client.models.embedContent>[0]),
+        ),
+      ),
     )
-    const embeddings = (response as { embeddings?: Array<{ values?: number[] }> }).embeddings
-    if (!embeddings || embeddings.length === 0) return null
-    return embeddings.map((e) => e.values ?? [])
+    const vectors = responses.map((response) => {
+      const r = response as { embeddings?: Array<{ values?: number[] }>; embedding?: { values?: number[] } }
+      return r.embeddings?.[0]?.values ?? r.embedding?.values ?? []
+    })
+    if (vectors.some((v) => v.length === 0)) return null
+    return vectors
   } catch (error) {
     console.warn('[gemini] embeddings unavailable:', error)
     return null
@@ -1265,17 +1275,20 @@ export async function findSimilarTasks(
 ): Promise<Record<number, { title: string; score: number }>> {
   const matches: Record<number, { title: string; score: number }> = {}
   if (newTitles.length === 0 || existingTitles.length === 0) return matches
-  const all = await embedTexts([...newTitles, ...existingTitles])
-  if (!all || all.length !== newTitles.length + existingTitles.length) return matches
+  // Keep the combined embed batch within budget (embedTexts caps at 24).
+  const existing = existingTitles.slice(0, Math.max(0, 24 - newTitles.length))
+  if (existing.length === 0) return matches
+  const all = await embedTexts([...newTitles, ...existing])
+  if (!all || all.length !== newTitles.length + existing.length) return matches
   const newVecs = all.slice(0, newTitles.length)
   const existingVecs = all.slice(newTitles.length)
   newTitles.forEach((_, i) => {
     let best = { title: '', score: 0 }
-    existingTitles.forEach((title, j) => {
+    existing.forEach((title, j) => {
       const score = cosineSimilarity(newVecs[i], existingVecs[j])
       if (score > best.score) best = { title, score }
     })
-    if (best.score >= 0.82) matches[i] = best
+    if (best.score >= 0.78) matches[i] = best
   })
   return matches
 }

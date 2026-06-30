@@ -7,7 +7,7 @@ The accountability companion that comes through when it matters. CLUTCH triages 
 **▶ Live app:** https://clutch-529610052804.us-central1.run.app/
 
 > **Vibe2Ship Hackathon Submission** · **Problem Statement 1: The Last-Minute Life Saver**
-> Live on Google Cloud Run · Core model: Gemini 2.5 via `@google/genai`
+> Live on Google Cloud Run · Cloud Scheduler · Firestore · Gemini 2.5 via `@google/genai`
 
 ---
 
@@ -43,12 +43,12 @@ CLUTCH remembers you across sessions, and the landing page adapts to your state.
 Each reasoning feature is driven by a named agent (see [The Agents](#the-agents)). The deterministic spine — triage scoring, the timer, tab-tracking, and the calendar handoff — stays rule-based on purpose.
 
 ### 1. Proactive Morning Briefing — *The Briefer*
-A time-aware morning digest. Before you look at your tasks, **The Briefer** analyzes your active workload, outstanding proofs, and historical follow-through rate to write a candid greeting, highlight your single highest-risk item, and deliver a concrete starting nudge.
-- **Google Tech:** Gemini 2.5 text generation. · **UI:** `Morning Briefing` tab.
+A time-aware morning digest. Before you look at your tasks, **The Briefer** analyzes your active workload, outstanding proofs, and historical follow-through rate to write a candid greeting, highlight your single highest-risk item, and deliver a concrete starting nudge. Tap **Listen** and The Briefer reads it aloud with Gemini's native text-to-speech (with a graceful fallback to the browser's speech engine).
+- **Google Tech:** Gemini 2.5 text generation + Gemini 2.5 Flash TTS (`responseModalities: ['AUDIO']`). · **UI:** `Morning Briefing` tab.
 
 ### 2. Messy Brain-Dump Parser — *The Scribe*
-Write your mind in plain language (*"submit the slides by tomorrow night, also call the dentist, finish the cloud run deployment before 2pm"*). **The Scribe** structures the stream into distinct tasks with inferred deadlines, category tags, and effort estimates.
-- **Google Tech:** Structured JSON output (`responseMimeType: 'application/json'` + `responseSchema`). · **UI:** `Brain Dump` inbox.
+Write your mind in plain language (*"submit the slides by tomorrow night, also call the dentist, finish the cloud run deployment before 2pm"*). **The Scribe** structures the stream into distinct tasks with inferred deadlines, category tags, and effort estimates. For each task it also decides **how far ahead of the deadline you should be warned**, based on complexity — a quick errand gets a couple of hours, a deep or high-stakes task gets a day or two. That lead time is shown on every task and is user-editable. As tasks are added, CLUTCH embeds them and flags anything **semantically close to a task you already have**, so you don't create silent duplicates.
+- **Google Tech:** Structured JSON output (`responseMimeType: 'application/json'` + `responseSchema`); Gemini text embeddings (`gemini-embedding-001`) for duplicate detection. · **UI:** `Brain Dump` inbox.
 
 ### 3. Smart Risk Triage Dashboard
 Tasks are ranked by a deterministic triage engine — intentionally *not* an agent, so the core ranking never fails — using a real-time risk score:
@@ -69,7 +69,7 @@ When you engage a task, **The Strategist** reads its behavioral history and sele
 
 ### 5. Grounded Action Plans — *The Coach*
 From your scoping answers or chosen path, **The Coach** generates a concrete starting artifact (an outline, a code template, a step-by-step plan). For research, study, or technical tasks it enables Google Search Grounding to attach real reference sources with clickable citations.
-- **Google Tech:** Google Search Grounding (`tools: [{ googleSearch: {} }]`).
+- **Google Tech:** Google Search Grounding + URL context (`tools: [{ googleSearch: {} }, { urlContext: {} }]`) — finds fresh sources *and* reads any link you pasted into the task.
 
 ### 6. Focus Timer & Google Calendar Handoff
 Once you agree to a plan, you commit to a duration. CLUTCH generates a pre-filled Google Calendar focus-block link so you can block your schedule in one click, then starts a countdown and monitors focus by tracking tab-visibility — counting off-task seconds and bailouts, and presenting an honest focus report at the end.
@@ -94,9 +94,9 @@ Hands-free input for brain dumps and scoping questions. Toggle the microphone bu
 Fully installable on Android, iOS, and Desktop. Offline cache shell with instant load and custom app mesh icon.
 - **Web Tech:** Service worker caching, web manifest.
 
-### 11. Proactive Email Alerts — *Resend Integration*
-Sends immediate HTML alerts to the user's registered inbox when a deadline is missed or a focus timer expires without accepted proof.
-- **Email Tech:** Resend SDK with background timer evaluation and localStorage anti-spam logic.
+### 11. Server-Side Proactive Alerts — *Cloud Scheduler → Cloud Run → Firestore*
+This is where "proactive" stops being tab-dependent and becomes real. When you enable email alerts, your task snapshot syncs to **Cloud Firestore**. A **Cloud Scheduler** job hits a secret-protected `/api/cron` endpoint on the Cloud Run service every hour; it reads every subscriber's tasks server-side and emails a warning *before* each deadline — using the per-task lead time The Scribe chose — whether or not anyone has the app open. Each item is de-duplicated, so you're warned once, not nagged. A focus timer that expires without accepted proof triggers the same path.
+- **Google Tech:** Cloud Scheduler (hourly cron trigger) · Cloud Run (host) · Cloud Firestore (subscriber store, written over its REST API using the Cloud Run service-account token — no keys, no SDK). · **Email:** Resend.
 
 ---
 
@@ -106,10 +106,10 @@ CLUTCH's reasoning is handled by six named agents on top of a deterministic spin
 
 | Agent | Role | Powered by |
 |-------|------|------------|
-| **The Briefer** | Writes your candid, time-aware morning briefing and flags your single highest-risk item | Gemini 2.5 (text) |
-| **The Scribe** | Turns a messy brain-dump into structured tasks with deadlines, tags, and effort | Gemini structured JSON (`responseSchema`) |
+| **The Briefer** | Writes your candid, time-aware morning briefing, flags your single highest-risk item, and reads it aloud on demand | Gemini 2.5 (text) + Flash TTS |
+| **The Scribe** | Turns a messy brain-dump into structured tasks with deadlines, tags, effort, and a complexity-based reminder lead time; flags near-duplicates | Gemini structured JSON + text embeddings |
 | **The Strategist** | Reads behavioral history and chooses how you start: scope, resume, or quick-start | Gemini decision routing + behavioral memory; function calling |
-| **The Coach** | Builds your concrete starting artifact and attaches real sources when the task needs them | Gemini + Google Search Grounding |
+| **The Coach** | Builds your concrete starting artifact and attaches real sources when the task needs them | Gemini + Google Search Grounding + URL context |
 | **The Verifier** | Inspects submitted proof — text or screenshot — and rules accepted / partial / rejected | Multimodal Gemini (inline image + text) |
 | **The Closer** | When proof falls short, decides the recovery move so you still finish | Agentic re-evaluation loop |
 
@@ -143,7 +143,9 @@ graph TD
 2. **Function calling** — the `Day Plan` screen uses Gemini `functionDeclarations` to run a local tool (`prioritizeDay` with a time budget) and summarize the result.
 3. **Grounding** — conditionally queries Google Search Grounding when a task needs factual, up-to-date references.
 4. **Multimodal reasoning** — The Verifier visually inspects uploaded screenshots to confirm proof matches the commitment.
-5. **Resilience & fallbacks** — every Gemini call is wrapped in `withGeminiResilience`: two automatic retries on transient errors, a 22-second timeout, and a fallback to local deterministic logic so the experience never hard-fails.
+5. **Resilience & fallbacks** — every Gemini call is wrapped in `withGeminiResilience`: automatic retries, a 22-second timeout, **multi-key rotation/failover** across API keys (a rate-limited or rejected key fails over to the next), and a fallback to local deterministic logic so the experience never hard-fails.
+6. **Agent-decided scheduling** — The Scribe assigns each task a reminder lead time from its complexity, and a server-side **Cloud Scheduler → Cloud Run → Firestore** loop acts on it, emailing a proactive warning before the deadline even when no one has the app open.
+7. **Semantic memory** — Gemini embeddings catch near-duplicate tasks at capture time so the list stays clean.
 
 ---
 
@@ -183,8 +185,10 @@ Other scripts: `npm run build` (production build) · `npm run start` (serve the 
 - **Icons:** Phosphor Icons
 
 **Google stack**
-- **SDK:** `@google/genai` (`gemini-2.5-flash` under the hood)
-- **APIs:** Google Calendar template API, Google Search Grounding, Resend API
+- **Models (`@google/genai` SDK):** `gemini-2.5-flash` (text, structured JSON, multimodal proof review, function calling) · `gemini-2.5-flash-preview-tts` (spoken briefing) · `gemini-embedding-001` (duplicate detection)
+- **Gemini tools:** Google Search Grounding + URL context
+- **Google Cloud:** Cloud Run (host) · Cloud Scheduler (hourly proactive cron) · Cloud Firestore (subscriber store, REST + service-account auth)
+- **Other APIs:** Google Calendar template link · Resend (email delivery)
 - **Deployment:** Google Cloud Run (multi-stage Docker build)
 
 **Credits**

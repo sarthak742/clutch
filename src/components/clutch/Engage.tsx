@@ -22,6 +22,17 @@ const MAIN: Step[] = ['scope', 'plan', 'work', 'proof']
 
 const stepIndex = (s: Step) => (s === 'acting' ? 0 : s === 'reviewing' || s === 'done' ? 3 : MAIN.indexOf(s))
 
+// Cycles reassuring progress lines so a multi-second Gemini call reads as
+// "working", not "stalled" — important for self-guided viewers.
+function ThinkingLine({ messages }: { messages: string[] }) {
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setI((v) => (v + 1) % messages.length), 2300)
+    return () => clearInterval(t)
+  }, [messages.length])
+  return <span style={{ color: 'var(--dim)' }}>{messages[i]}</span>
+}
+
 
 function withRouterTrace(plan: ActionPlan, decision: InterventionDecision | null): ActionPlan {
   if (!decision) return plan
@@ -408,7 +419,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
             {!questions ? (
               <div className="flex items-center gap-3" style={{ minHeight: 120 }}>
                 <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 14px 3px rgba(90,99,230,.6)', animation: 'breathe 1.6s ease-in-out infinite' }} />
-                <span style={{ color: 'var(--dim)' }}>Working out what I need to know…</span>
+                <ThinkingLine messages={['Reading your history…', 'Choosing the lowest-friction way in…', 'Drafting your starting point…', 'Gemini is reasoning — a few seconds…']} />
               </div>
             ) : (
               <>
@@ -442,7 +453,7 @@ export function Engage({ task, followThrough, onUpdateTask, onFollowThrough, onB
         {step === 'acting' && (
           <div className="flex items-center justify-center gap-3" style={{ flex: 1, minHeight: 200 }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 18px 4px rgba(90,99,230,.7)', animation: 'breathe 1.6s ease-in-out infinite' }} />
-            <span style={{ color: 'var(--dim)' }}>Clutch is building your move…</span>
+            <ThinkingLine messages={['Diagnosing what is really blocking you…', 'Building your starting artifact…', 'Gemini is reasoning — a few seconds…']} />
           </div>
         )}
 

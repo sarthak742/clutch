@@ -58,18 +58,34 @@ export function Landing({ tasks, followThrough, onStart, onAddMore, onLoadDemo }
               The app that steps in before your <span style={{ color: '#4f83ff', textShadow: '0 0 24px rgba(0,136,255,.38)' }}>deadline slips.</span>
             </p>
             <p style={{ fontSize: 17, lineHeight: 1.55, color: 'rgba(243,245,244,.62)', maxWidth: '46ch', marginBottom: 34 }}>
-              Real AI accountability that helps you plan with clarity, follow through with evidence, and learn from every cycle.
+              Plan with clarity, then prove you did it. <strong style={{ color: 'rgba(243,245,244,.94)', fontWeight: 700 }}>You can&apos;t lie to CLUTCH</strong> — it won&apos;t let you check a box without evidence. Show the work, or it doesn&apos;t count.
             </p>
 
             <div className="flex flex-wrap gap-3" style={{ marginBottom: 30 }}>
-              <button onClick={onStart} className="btn-primary flex items-center justify-center gap-2.5" style={{ padding: '20px 26px', borderRadius: 14, fontSize: 17, minWidth: 232 }}>
-                <span>{tasks.length > 0 ? 'Open my dashboard' : 'Start with my tasks'}</span>
-                <ArrowRight size={18} weight="bold" />
-              </button>
-              {onLoadDemo && (
-                <button onClick={handleDemoClick} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '20px 23px', borderRadius: 14, fontSize: 17, fontWeight: 700 }}>
-                  <span>{tasks.length > 0 ? 'Reset & see demo' : 'See the demo flow'}</span>
-                </button>
+              {tasks.length > 0 ? (
+                <>
+                  <button onClick={onStart} className="btn-primary flex items-center justify-center gap-2.5" style={{ padding: '20px 26px', borderRadius: 14, fontSize: 17, minWidth: 232 }}>
+                    <span>Open my dashboard</span>
+                    <ArrowRight size={18} weight="bold" />
+                  </button>
+                  {onLoadDemo && (
+                    <button onClick={handleDemoClick} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '20px 23px', borderRadius: 14, fontSize: 17, fontWeight: 700 }}>
+                      <span>Reset &amp; see demo</span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {onLoadDemo && (
+                    <button onClick={handleDemoClick} className="btn-primary flex items-center justify-center gap-2.5" style={{ padding: '20px 26px', borderRadius: 14, fontSize: 17, minWidth: 232 }}>
+                      <span>See the live demo</span>
+                      <ArrowRight size={18} weight="bold" />
+                    </button>
+                  )}
+                  <button onClick={onStart} className="btn-ghost flex items-center justify-center gap-2.5" style={{ padding: '20px 23px', borderRadius: 14, fontSize: 17, fontWeight: 700 }}>
+                    <span>Start with my tasks</span>
+                  </button>
+                </>
               )}
             </div>
 
@@ -210,10 +226,11 @@ function LivePreview({ tasks, topTitle, risk, stats, followUp, focusBlock, groun
           }}
         >
           <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 10px rgba(90, 99, 230, 0.8)', animation: 'pulse-ring 1.5s infinite' }} />
-          <span>Interactive Preview &bull; Click <strong>Start with my tasks</strong> or <strong>See the demo flow</strong></span>
+          <span>Preview only &bull; Open the real app: <strong>See the live demo</strong> or <strong>Start with my tasks</strong></span>
 
         </div>
       )}
+      <div style={{ position: 'absolute', top: 10, right: 18, zIndex: 60, pointerEvents: 'none', background: 'rgba(8,7,15,.82)', border: '1px solid rgba(150,170,210,.4)', borderRadius: 999, padding: '4px 11px', fontSize: 9.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(243,245,244,.72)', fontFamily: 'var(--font-code)' }}>Preview</div>
     </div>
   )
 }

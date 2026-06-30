@@ -529,7 +529,7 @@ function TopRiskCard({ top, onEngage, onDefer }: { top: ReturnType<typeof rankTa
           <span className="mono" style={{ fontSize: 12, color: 'var(--accent)' }}>{Math.min(99, Math.max(15, Math.round(top.score)))}% risk</span>
         </div>
         <button onClick={() => onEngage(top.task.id)} className="btn-primary flex items-center justify-center gap-2.5" style={{ width: '100%', padding: 18, borderRadius: 16, fontSize: 16 }}>
-          <span>Start - I&apos;ll ask you a few questions</span>
+          <span>Start — Clutch finds the fastest way in</span>
           <ArrowRight size={18} weight="bold" />
         </button>
         <button onClick={() => onDefer(top.task.id)} style={{ width: '100%', marginTop: 10, padding: 11, borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--faint)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>Not right now</button>
